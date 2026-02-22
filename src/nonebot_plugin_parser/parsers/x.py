@@ -57,9 +57,7 @@ class TwitterParser(BaseParser):
         return self._collect_result(data)
 
     def _collect_result(self, data: VxTwitterResponse) -> ParseResult:
-        author = self.create_author(
-            f"{data.user_name} @{data.user_screen_name}", data.user_profile_image_url
-        )
+        author = self.create_author(data.user_name, data.user_profile_image_url)
 
         contents: list[MediaContent | str] = [data.text]
 
@@ -77,4 +75,5 @@ class TwitterParser(BaseParser):
             timestamp=data.date_epoch,
             content=contents,
             repost=repost,
+            extra={"scree_name": data.user_screen_name},
         )
