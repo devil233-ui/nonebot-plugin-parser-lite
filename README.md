@@ -139,10 +139,7 @@ from re import Match
 from typing import ClassVar
 
 from httpx import AsyncClient
-from nonebot import require
-
-require("nonebot_plugin_parser")
-from nonebot_plugin_parser.parsers import BaseParser, Platform, handle
+from .base import BaseParser, Platform, handle
 
 class ExampleParser(BaseParser):
     """示例视频网站解析器"""

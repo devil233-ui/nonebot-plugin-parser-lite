@@ -1,3 +1,4 @@
+# ruff: noqa: E402
 import asyncio
 
 from nonebot import logger, require
@@ -5,10 +6,13 @@ from nonebot.plugin import PluginMetadata, inherit_supported_adapters
 
 require("nonebot_plugin_alconna")
 require("nonebot_plugin_uninfo")
+require("nonebot_plugin_htmlrender")
+require("nonebot_plugin_apscheduler")
 
 from .utils import safe_unlink
 from .config import Config, pconfig
 from .matchers import clear_result_cache
+from nonebot_plugin_apscheduler import scheduler
 
 __plugin_meta__ = PluginMetadata(
     name="链接分享解析 Alconna 版",
@@ -17,16 +21,15 @@ __plugin_meta__ = PluginMetadata(
     type="application",
     homepage="https://github.com/fllesser/nonebot-plugin-parser",
     config=Config,
-    supported_adapters=inherit_supported_adapters("nonebot_plugin_alconna", "nonebot_plugin_uninfo"),
+    supported_adapters=inherit_supported_adapters(
+        "nonebot_plugin_alconna", "nonebot_plugin_uninfo"
+    ),
     extra={
         "author": "fllesser",
         "email": "fllessive@gmail.com",
         "homepage": "https://github.com/fllesser/nonebot-plugin-parser",
     },
 )
-
-require("nonebot_plugin_apscheduler")
-from nonebot_plugin_apscheduler import scheduler
 
 
 @scheduler.scheduled_job("cron", hour=1, minute=0, id="parser-clean-local-cache")
