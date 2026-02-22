@@ -5,6 +5,8 @@ from datetime import datetime
 from dataclasses import field, dataclass
 from collections.abc import Callable, Sequence, Coroutine
 
+from ..renders.utils import build_html
+
 
 def repr_path_task(
     path_task: Path | Task[Path] | Callable[[], Coroutine[Any, Any, Path]],
@@ -76,7 +78,7 @@ class ImageContent(MediaContent):
 
 @dataclass(repr=False, slots=True)
 class GraphicsContent(MediaContent):
-    """图文内容 渲染时文字在前 图片在后"""
+    """图文内容 即不参与九宫格的图片"""
 
     alt: str | None = None
     """图片描述 渲染时居中显示"""
@@ -167,6 +169,10 @@ class Comment:
         comment.parent_author = parent or self.author
         self.replies.append(comment)
 
+    async def html_content(self) -> str:
+        """用于在jinja中获取html内容"""
+        return await build_html(self.content)
+
     @property
     def formatted_datetime(self) -> str | None:
         """格式化时间戳"""
@@ -193,7 +199,7 @@ class ParseResult:
     """资源/文本内容"""
     state: State | None = None
     """统计信息"""
-    comment: list[Comment] = field(default_factory=list)
+    comments: list[Comment] = field(default_factory=list)
     """评论列表"""
     extra: dict[str, Any] = field(default_factory=dict)
     """额外信息"""
@@ -227,7 +233,9 @@ class ParseResult:
                 return await cont.get_path()
 
         # 如果没有视频和图片内容，使用默认图片
-        default_image_path = Path(__file__).parent.parent / "renders" / "resources" / "QIQI.jpg"
+        default_image_path = (
+            Path(__file__).parent.parent / "renders" / "resources" / "QIQI.jpg"
+        )
         return default_image_path if default_image_path.exists() else None
 
     @property

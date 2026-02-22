@@ -295,7 +295,7 @@ class Renderer:
         """解析 ParseResult 为模板可用的字典数据"""
 
         logo_path = Path(__file__).parent / "resources" / f"{result.platform.name}.png"
-        content = build_html(result.content)
+        content = await build_html(result.content)
 
         # if ori := result.extra.get("origin"):
         #     if oric := ori.get("contents"):
@@ -313,7 +313,8 @@ class Renderer:
             },
             "content": content,
             "cover_path": await result.cover_path,
-            "text": build_plain_text(result.content),
+            "state": result.state,
+            "comments": result.comments,
         }
 
         if result.author:

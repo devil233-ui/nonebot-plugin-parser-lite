@@ -46,7 +46,7 @@ def build_images(
     if isinstance(img_list[0], str):
         img_src_list = img_list  # type: ignore[assignment]
     else:
-        if key is None:
+        if not key:
             raise ValueError("当传入字典列表时必须指定 key 参数作为图片链接字段名")
         mapping_list = cast(Sequence[Mapping[str, Any]], img_list)
         for item in mapping_list:
@@ -79,7 +79,9 @@ def build_images(
         # 最后一张叠加 "+N"
         if hidden_count > 0 and idx == len(visible_imgs) - 1:
             more_html = f'<div class="more-count">+{hidden_count}</div>'
-        items_html.append('<div class="image-item">' f'<img src="{src}">{more_html}</div>')
+        items_html.append(
+            '<div class="image-item">' f'<img src="{src}">{more_html}</div>'
+        )
 
     return (
         '<div class="images-container">'
@@ -98,8 +100,8 @@ async def build_html(content: Sequence[MediaContent | str | None]) -> str:
     """
     html_parts: list[str] = []
 
-    # 当前图片段相关状态：用于处理“连续图片合并为宫格”
     current_imgs: list[str] = []
+    """当前图片段相关状态：用于处理“连续图片合并为宫格”"""
 
     def flush_images() -> None:
         """结束当前连续图片段并写入 HTML."""
@@ -108,11 +110,9 @@ async def build_html(content: Sequence[MediaContent | str | None]) -> str:
             html_parts.append(build_images(current_imgs))
             current_imgs = []
 
-    # 预先看一眼“下一个内容”，用于判断文本后面是否紧跟贴纸
     total = len(content)
 
     for idx, cont in enumerate(content):
-        # 处理图片内容
         if isinstance(cont, ImageContent):
             path = await cont.get_path()
             src = path.as_uri()
@@ -123,7 +123,9 @@ async def build_html(content: Sequence[MediaContent | str | None]) -> str:
 
             # 计算“前一个 / 后一个是否是贴纸”
             prev_is_sticker = idx > 0 and isinstance(content[idx - 1], StickerContent)
-            next_is_sticker = idx + 1 < total and isinstance(content[idx + 1], StickerContent)
+            next_is_sticker = idx + 1 < total and isinstance(
+                content[idx + 1], StickerContent
+            )
 
             if isinstance(cont, str):
                 # 只要前后任意一侧是贴纸，就用 span；否则用 p
@@ -149,7 +151,6 @@ async def build_html(content: Sequence[MediaContent | str | None]) -> str:
                 s_path = await cont.get_path()
                 s_src = s_path.as_uri()
                 size = cont.size or "medium"
-                # 贴纸本身用 span 包裹，从而能紧跟在文本 span 后面排在同一行
                 html_parts.append(f'<img class="sticker {size}" src="{s_src}">')
 
     # 末尾如果还有图片段，补一次 flush
