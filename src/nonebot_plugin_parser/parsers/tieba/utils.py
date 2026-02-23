@@ -1,14 +1,11 @@
 # pyright: reportAttributeAccessIssue=false
 
-import contextlib
-from typing import Any
 from pathlib import Path
-from datetime import datetime
 
 from httpx import AsyncClient, NetworkError
 from google.protobuf import descriptor_pb2, descriptor_pool
 from google.protobuf.message_factory import GetMessageClass
-from ..data import MediaContent, VideoContent, StickerContent, GraphicContent
+from ..data import MediaContent, Comment
 from .models import (
     Post,
     Posts,
@@ -20,10 +17,14 @@ from .models import (
     FragImage,
     FragVideo,
 )
-from ...download import DOWNLOADER
-from ...constants import COMMON_HEADER
-
-headers = COMMON_HEADER.copy()
+from ..funcs import (
+    create_graphic,
+    create_stats,
+    create_video,
+    create_sticker,
+    create_comment,
+    create_author,
+)
 
 
 def get_message(name: str):
@@ -105,7 +106,7 @@ async def get_post(tid: int) -> Posts:
     return parse_res(data)
 
 
-def build_contents(posts: Posts) -> list[MediaContent | str]:
+def build_content(posts: Posts) -> list[MediaContent | str]:
     """
     构建帖子内容
 
@@ -120,20 +121,21 @@ def build_contents(posts: Posts) -> list[MediaContent | str]:
         if isinstance(part, FragText):
             contents.append(part.text)
         elif isinstance(part, FragEmoji):
-            sticker_task = DOWNLOADER.download_img(
-                f"https://tb3.bdstatic.com/emoji/{part.id}@2x.png",
-                ext_headers=headers,
+            contents.append(
+                create_sticker(
+                    url=f"https://tb3.bdstatic.com/emoji/{part.id}@2x.png",
+                    size="small",
+                    desc=part.desc,
+                )
             )
-            contents.append(StickerContent(sticker_task, "small", part.desc))
         elif isinstance(part, FragImage):
-            image_task = DOWNLOADER.download_img(part.origin_src, ext_headers=headers)
-            contents.append(GraphicContent(image_task))
+            contents.append(create_graphic(part.origin_src))
         elif isinstance(part, FragAt):
             # 如果上一项是文本，则追加到上一项末尾
             if contents and isinstance(contents[-1], str):
-                contents[-1] += f"@{part.text}&nbsp;"  # &nbsp;
+                contents[-1] += f"@{part.text} "
             else:
-                contents.append(f"@{part.text}&nbsp;")
+                contents.append(f"@{part.text} ")
         elif isinstance(part, FragLink):
             url_str = str(part.url)
             if contents and isinstance(contents[-1], str):
@@ -141,9 +143,13 @@ def build_contents(posts: Posts) -> list[MediaContent | str]:
             else:
                 contents.append(url_str)
         elif isinstance(part, FragVideo):
-            video_task = DOWNLOADER.download_video(part.src, ext_headers=headers)
-            cover_task = DOWNLOADER.download_img(part.cover_src, ext_headers=headers)
-            contents.append(VideoContent(video_task, cover_task, part.duration))
+            contents.append(
+                create_video(
+                    url_or_task=part.src,
+                    cover_url=part.cover_src,
+                    duration=part.duration,
+                )
+            )
         # 经过测试，所有帖子中的语音均无法播放，无法进行地址捕获
         # 现在好像也发不了这玩意了
         # 最近的语音消息在2018年
@@ -154,34 +160,34 @@ def build_contents(posts: Posts) -> list[MediaContent | str]:
     return contents
 
 
-def build_comment_content(contents: Contents) -> str:
+def build_comment(contents: Contents) -> list[MediaContent | str]:
     """
-    构建帖子评论HTML内容
+    构建帖子评论内容
 
     :param contents: 内容碎片列表
     """
-    content = ""
+    content: list[MediaContent | str] = []
     for part in contents.objs:
         if isinstance(part, FragText):
-            content += part.text
+            content.append(part.text)
         elif isinstance(part, FragEmoji):
-            content += f'<img class="sticker small" src="https://tb3.bdstatic.com/emoji/{part.id}@2x.png">'
-        elif isinstance(part, FragImage):
-            content += (
-                '<div class="images-container">'
-                f'<div class="images-grid single">'
-                '<div class="image-item">'
-                f'<img src="{part.origin_src}">'
-                "</div></div></div>"
+            content.append(
+                create_sticker(
+                    url=f"https://tb3.bdstatic.com/emoji/{part.id}@2x.png",
+                    size="small",
+                    desc=part.desc,
+                )
             )
+        elif isinstance(part, FragImage):
+            content.append(create_graphic(part.origin_src))
         elif isinstance(part, FragAt):
-            content += f"@{part.text}&nbsp;"
+            content.append(f"@{part.text} ")
         elif isinstance(part, FragLink):
-            content += str(part.url)
+            content.append(str(part.url))
     return content
 
 
-def build_comments(posts: list[Post], poster_id: int) -> list[dict[str, Any]]:
+def build_comments(posts: list[Post], poster_id: int) -> list[Comment]:
     """
     构建帖子评论
 
@@ -203,49 +209,41 @@ def build_comments(posts: list[Post], poster_id: int) -> list[dict[str, Any]]:
     combined_comments: list[Post] = main_comments[:5] + other_comments[:5]
 
     for post in combined_comments:
-        # 处理评论作者信息
-        comment_author = {
-            "name": post.user.show_name,
-            "avatar": f"http://tb.himg.baidu.com/sys/portraith/item/{post.user.portrait}",
-        }
-
-        # 处理评论时间
-        formatted_time = ""
-        if post.create_time:
-            with contextlib.suppress(Exception):
-                dt = datetime.fromtimestamp(post.create_time)
-                formatted_time = dt.strftime("%Y-%m-%d %H:%M")
+        comment_author = create_author(
+            name=post.user.show_name,
+            avatar_url=f"http://tb.himg.baidu.com/sys/portraith/item/{post.user.portrait}",
+            id=post.user.portrait,
+        )
         # 处理楼中楼评论
         child_posts = []
         if post.comments:
-            for comment in post.comments[:3]:  # 每个评论最多显示3条楼中楼
-                child_author = {
-                    "name": comment.user.show_name,
-                    "avatar": f"http://tb.himg.baidu.com/sys/portraith/item/{comment.user.portrait}",
-                }
-
-                child_formatted_time = ""
-                if hasattr(comment, "create_time") and comment.create_time:
-                    with contextlib.suppress(Exception):
-                        dt = datetime.fromtimestamp(comment.create_time)
-                        child_formatted_time = dt.strftime("%Y-%m-%d %H:%M")
-                child_posts.append(
-                    {
-                        "author": child_author,
-                        "content": build_comment_content(comment.contents),
-                        "formatted_time": child_formatted_time,
-                        "ups": comment.agree,
-                    }
+            child_posts.extend(
+                create_comment(
+                    author=create_author(
+                        name=comment.user.show_name,
+                        avatar_url=f"http://tb.himg.baidu.com/sys/portraith/item/{comment.user.portrait}",
+                        id=comment.user.portrait,
+                    ),
+                    content=build_comment(comment.contents),
+                    timestamp=comment.create_time,
+                    stats=create_stats(
+                        like_count=str(comment.agree) if comment.agree else None
+                    ),
+                    location=comment.user.ip,
+                    parent_author=comment_author,
                 )
-
+                for comment in post.comments[:3]
+            )
         comments.append(
-            {
-                "author": comment_author,
-                "content": build_comment_content(post.contents),
-                "formatted_time": formatted_time,
-                "ups": post.agree,
-                "comments": len(child_posts),
-                "child_posts": child_posts,
-            }
+            create_comment(
+                author=comment_author,
+                content=build_comment(post.contents),
+                timestamp=post.create_time,
+                stats=create_stats(
+                    like_count=str(post.agree), comment_count=str(post.reply_num)
+                ),
+                location=post.user.ip,
+                replies=child_posts,
+            )
         )
     return comments

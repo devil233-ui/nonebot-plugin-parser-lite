@@ -16,7 +16,9 @@ from ..constants import COMMON_HEADER
 
 class ToutiaoParser(BaseParser):
     # 平台信息
-    platform: ClassVar[Platform] = Platform(name=PlatformEnum.TOUTIAO, display_name="今日头条")
+    platform: ClassVar[Platform] = Platform(
+        name=PlatformEnum.TOUTIAO, display_name="今日头条"
+    )
 
     @handle(
         "ixigua.com",
@@ -36,9 +38,13 @@ class ToutiaoParser(BaseParser):
         # 使用API解析
         try:
             headers = COMMON_HEADER.copy()
-            headers.update({"Content-Type": "application/json", "User-Agent": "API-Client/1.0"})
+            headers.update(
+                {"Content-Type": "application/json", "User-Agent": "API-Client/1.0"}
+            )
 
-            async with AsyncClient(headers=headers, verify=False, timeout=self.timeout) as client:
+            async with AsyncClient(
+                headers=headers, verify=False, timeout=self.timeout
+            ) as client:
                 api_url = "https://api.bugpk.com/api/toutiao"
                 params = {"url": share_url}
                 resp = await client.get(api_url, params=params)
@@ -70,7 +76,9 @@ class ToutiaoParser(BaseParser):
 
                 # 检查接口返回状态
                 if data.get("code") != 200:
-                    raise ParseException(f"今日头条接口返回错误: {data.get('msg', '未知错误')}")
+                    raise ParseException(
+                        f"今日头条接口返回错误: {data.get('msg', '未知错误')}"
+                    )
 
                 video_data = data.get("data")
                 if not video_data or not isinstance(video_data, dict):
@@ -96,7 +104,10 @@ class ToutiaoParser(BaseParser):
                 )
 
                 # 构建内容列表
-                contents: list[MediaContent | str] = [video_data.get("description", ""), video_content]
+                contents: list[MediaContent | str] = [
+                    video_data.get("description", ""),
+                    video_content,
+                ]
 
                 # 构建额外信息
                 extra = {
@@ -112,7 +123,9 @@ class ToutiaoParser(BaseParser):
 
                 return self.result(
                     title=video_data.get("title", "无标题"),
-                    author=self.create_author(author_name, author_avatar),
+                    author=self.create_author(
+                        name=author_name, avatar_url=author_avatar
+                    ),
                     url=share_url,
                     content=contents,
                     extra=extra,

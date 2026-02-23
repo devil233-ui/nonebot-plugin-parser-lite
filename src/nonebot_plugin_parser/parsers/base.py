@@ -4,7 +4,7 @@
 import asyncio
 from re import Match, Pattern, compile
 from abc import ABC
-from typing import TYPE_CHECKING, Any, Literal, TypeVar, ClassVar, cast
+from typing import TYPE_CHECKING, Any, Literal, Sequence, TypeVar, ClassVar, cast
 from asyncio import Task
 from pathlib import Path
 from collections.abc import Callable, Coroutine
@@ -12,25 +12,30 @@ from typing_extensions import Unpack, ParamSpec
 
 P = ParamSpec("P")
 R = TypeVar("R")
-import os
 
 from httpx import AsyncClient
 
 from .data import (
-    Stats,
     Author,
-    Comment,
-    Platform,
-    ParseResult,
-    AudioContent,
-    ImageContent,
     MediaContent,
-    VideoContent,
-    StickerContent,
-    GraphicContent,
+    ParseResult,
     ParseResultKwargs,
+    Platform,
+    Comment,
+    Stats,
 )
-from ..utils import keep_zh_en_num
+from .funcs import (
+    create_author,
+    create_audio,
+    create_comment,
+    create_graphic,
+    create_image,
+    create_images,
+    create_stats,
+    create_sticker,
+    create_video,
+    create_videos,
+)
 from ..config import pconfig as pconfig
 from ..download import DOWNLOADER as DOWNLOADER
 from ..constants import IOS_HEADER, COMMON_HEADER, ANDROID_HEADER, COMMON_TIMEOUT
@@ -245,7 +250,7 @@ class BaseParser:
         name: str,
         avatar_url: str | None = None,
         description: str | None = None,
-        id: str | int | None = None,
+        id: str | None = None,
     ):
         """
         创建作者对象
@@ -256,10 +261,9 @@ class BaseParser:
         :param id: 作者 ID
         """
 
-        avatar_task = None
-        if avatar_url:
-            avatar_task = DOWNLOADER.download_img(avatar_url, ext_headers=self.headers)
-        return Author(name=name, avatar=avatar_task, description=description, id=id)
+        return create_author(
+            name=name, avatar_url=avatar_url, description=description, id=id
+        )
 
     def create_video(
         self,
@@ -267,6 +271,7 @@ class BaseParser:
         cover_url: str | None = None,
         duration: float = 0.0,
         video_name: str | None = None,
+        need_send: bool = True,
     ):
         """
         创建视频内容
@@ -275,25 +280,16 @@ class BaseParser:
         :param cover_url: 封面 URL
         :param duration: 视频时长
         :param video_name: 视频名称
+        :param need_send: 是否发送
         """
 
-        # 清理文件名，只保留安全字符
-        if video_name:
-            # 保留文件名中的后缀
-
-            base_name, ext = os.path.splitext(video_name)
-            cleaned_base = keep_zh_en_num(base_name)
-            video_name = f"{cleaned_base}{ext}"
-
-        cover_task = None
-        if cover_url:
-            cover_task = DOWNLOADER.download_img(cover_url, ext_headers=self.headers)
-        if isinstance(url_or_task, str):
-            url_or_task = DOWNLOADER.download_video(
-                url_or_task, video_name=video_name, ext_headers=self.headers
-            )
-
-        return VideoContent(url_or_task, cover_task, duration)
+        return create_video(
+            url_or_task=url_or_task,
+            cover_url=cover_url,
+            duration=duration,
+            video_name=video_name,
+            need_send=need_send,
+        )
 
     def create_videos(
         self,
@@ -305,7 +301,7 @@ class BaseParser:
         :param video_urls: 视频 URL 列表
         """
 
-        return [self.create_video(url) for url in video_urls]
+        return create_videos(video_urls)
 
     def create_images(
         self,
@@ -317,28 +313,28 @@ class BaseParser:
         :param image_urls: 图片 URL 列表
         """
 
-        return [self.create_image(url) for url in image_urls]
+        return create_images(image_urls)
 
     def create_image(
         self,
         url_or_task: str | Task[Path],
+        need_send: bool = True,
     ):
         """
         创建图片内容
 
         :param url_or_task: 图片 URL 或下载任务
+        :param need_send: 是否发送
         """
 
-        if isinstance(url_or_task, str):
-            url_or_task = DOWNLOADER.download_img(url_or_task, ext_headers=self.headers)
-
-        return ImageContent(url_or_task)
+        return create_image(url_or_task=url_or_task, need_send=need_send)
 
     def create_audio(
         self,
         url_or_task: str | Task[Path],
         duration: float = 0.0,
         audio_name: str | None = None,
+        need_send: bool = True,
     ):
         """
         创建音频内容
@@ -346,37 +342,31 @@ class BaseParser:
         :param url_or_task: 音频 URL 或下载任务
         :param duration: 音频时长
         :param audio_name: 音频名称
+        :param need_send: 是否发送
         """
 
-        # 清理文件名，只保留安全字符
-        if audio_name:
-            # 保留文件名中的后缀
-
-            base_name, ext = os.path.splitext(audio_name)
-            cleaned_base = keep_zh_en_num(base_name)
-            audio_name = f"{cleaned_base}{ext}"
-
-        if isinstance(url_or_task, str):
-            url_or_task = DOWNLOADER.download_audio(
-                url_or_task, audio_name=audio_name, ext_headers=self.headers
-            )
-
-        return AudioContent(url_or_task, duration)
+        return create_audio(
+            url_or_task=url_or_task,
+            duration=duration,
+            audio_name=audio_name,
+            need_send=need_send,
+        )
 
     def create_graphic(
         self,
         image_url: str,
         alt: str | None = None,
+        need_send: bool = True,
     ):
         """
-        创建仅渲染图片,此图片不参与九宫格且不会被下载发送给用户
+        图片,此图片不参与九宫格
 
         :param image_url: 图片 URL
         :param alt: 图片描述
+        :param need_send: 是否发送
         """
 
-        image_task = DOWNLOADER.download_img(image_url, ext_headers=self.headers)
-        return GraphicContent(image_task, alt)
+        return create_graphic(image_url=image_url, alt=alt, need_send=need_send)
 
     def create_sticker(
         self,
@@ -393,16 +383,15 @@ class BaseParser:
             - medium: 文字大小的两倍大一点
         """
 
-        image_task = DOWNLOADER.download_img(url, ext_headers=self.headers)
-        return StickerContent(image_task, size, desc)
+        return create_sticker(url=url, size=size, desc=desc)
 
     def create_stats(
         self,
-        view_count: int = 0,
-        like_count: int = 0,
-        collect_count: int = 0,
-        share_count: int = 0,
-        comment_count: int = 0,
+        view_count: str | None = None,
+        like_count: str | None = None,
+        collect_count: str | None = None,
+        share_count: str | None = None,
+        comment_count: str | None = None,
         extra: dict[str, Any] | None = None,
     ):
         """
@@ -415,13 +404,10 @@ class BaseParser:
         :param comment_count: 评论数
         :param extra: 额外的信息
         """
-        if extra is None:
-            extra = {}
-
-        return Stats(
+        return create_stats(
             view_count=view_count,
             like_count=like_count,
-            collecte_count=collect_count,
+            collect_count=collect_count,
             share_count=share_count,
             comment_count=comment_count,
             extra=extra,
@@ -430,7 +416,7 @@ class BaseParser:
     def create_comment(
         self,
         author: Author,
-        content: list[MediaContent | str | None],
+        content: Sequence[MediaContent | str | None],
         timestamp: int | None = None,
         state: Stats | None = None,
         location: str | None = None,
@@ -449,13 +435,11 @@ class BaseParser:
         :param parent_author: 评论的父级作者
         """
 
-        if replies is None:
-            replies = []
-        return Comment(
+        return create_comment(
             author=author,
             content=content,
             timestamp=timestamp,
-            state=state,
+            stats=state,
             location=location,
             replies=replies,
             parent_author=parent_author,

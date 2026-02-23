@@ -13,7 +13,9 @@ from ..data import MediaContent
 
 class WeiBoParser(BaseParser):
     # 平台信息
-    platform: ClassVar[Platform] = Platform(name=PlatformEnum.WEIBO, display_name="微博")
+    platform: ClassVar[Platform] = Platform(
+        name=PlatformEnum.WEIBO, display_name="微博"
+    )
 
     def __init__(self):
         super().__init__()
@@ -23,6 +25,7 @@ class WeiBoParser(BaseParser):
                 "image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"
             ),
             "referer": "https://weibo.com/",
+            "origin": "https://weibo.com",
         }
         self.headers.update(extra_headers)
 
@@ -104,8 +107,8 @@ class WeiBoParser(BaseParser):
                     contents.append(self.create_image(src))
 
         author = self.create_author(
-            data.userinfo.screen_name,
-            data.userinfo.profile_image_url,
+            name=data.userinfo.screen_name,
+            avatar_url=data.userinfo.profile_image_url,
         )
 
         return self.result(
@@ -135,9 +138,9 @@ class WeiBoParser(BaseParser):
         data = show.decoder.decode(response.content).data
         play_info = data.Component_Play_Playinfo
         author = self.create_author(
-            play_info.name,
-            play_info.avatar,
-            play_info.description,
+            name=play_info.name,
+            avatar_url=play_info.avatar,
+            description=play_info.description,
         )
         video_content = self.create_video(
             play_info.video_url,
@@ -180,12 +183,18 @@ class WeiBoParser(BaseParser):
             response = await client.get(url)
             if response.status_code != 200:
                 if response.status_code in (403, 418):
-                    raise ParseException(f"被风控拦截({response.status_code}), 可尝试更换 UA/Referer 或稍后重试")
-                raise ParseException(f"获取数据失败 {response.status_code} {response.reason_phrase}")
+                    raise ParseException(
+                        f"被风控拦截({response.status_code}), 可尝试更换 UA/Referer 或稍后重试"
+                    )
+                raise ParseException(
+                    f"获取数据失败 {response.status_code} {response.reason_phrase}"
+                )
 
             ctype = response.headers.get("content-type", "")
             if "application/json" not in ctype:
-                raise ParseException(f"获取数据失败 content-type is not application/json (got: {ctype})")
+                raise ParseException(
+                    f"获取数据失败 content-type is not application/json (got: {ctype})"
+                )
 
         weibo_data = common.decoder.decode(response.content).data
 
@@ -204,7 +213,9 @@ class WeiBoParser(BaseParser):
             contents.extend(self.create_images(image_urls))
 
         # 构建作者
-        author = self.create_author(data.display_name, data.user.profile_image_url)
+        author = self.create_author(
+            name=data.display_name, avatar_url=data.user.profile_image_url
+        )
         repost = None
         if data.retweeted_status:
             repost = self._collect_result(data.retweeted_status)

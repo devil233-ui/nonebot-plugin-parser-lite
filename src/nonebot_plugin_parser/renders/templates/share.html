@@ -1,9 +1,148 @@
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
+  @import url("https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Segoe+UI:wght@400;600;700&display=swap");
+
+  :root {
+    --primary-color: #e74c3c;
+    --secondary-color: #3498db;
+    --dark-color: #2c3e50;
+    --light-color: #ecf0f1;
+    --gray-color: #95a5a6;
+    --border-radius: 12px;
+    --box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+    --transition: all 0.3s ease;
+  }
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', 'Noto Sans SC', sans-serif;
+  }
+
+  body {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+    background: transparent;
+    padding: 20px;
+  }
+
+  .card {
+    width: 750px;
+    background-color: white;
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+    overflow: hidden;
+    position: relative;
+    margin-bottom: 20px;
+    border: 1px solid rgba(0, 0, 0, 0.02);
+  }
+
+  /* 装饰性条纹 */
+  .decorative-stripe {
+    position: absolute;
+    width: 100%;
+    height: 5px;
+    background: linear-gradient(90deg, var(--primary-color) 0%, var(--secondary-color) 50%, #9b59b6 100%);
+    top: 0;
+    left: 0;
+    z-index: 5;
+  }
+
+  /* 中部内容区域 */
+  .content-section {
+    padding: 30px;
+  }
+
+  /* 顶部封面区域 */
+  .cover-section {
+    position: relative;
+    width: 100%;
+    max-height: 400px;
+    background-color: #f0f2f5;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .cover-image {
+    width: 100%;
+    height: auto;
+    object-fit: cover;
+  }
+
+  .cover-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.1) 0%, rgba(0, 0, 0, 0.05) 70%, rgba(0, 0, 0, 0.3) 100%);
+    pointer-events: none;
+  }
+
+  .platform-logo {
+    position: absolute;
+    right: 3px;
+    top: 5px;
+    height: 33px;
+    width: auto;
+  }
+
+  .header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px dashed #eee;
+  }
+
+  .avatar {
+    width: 56px;
+    height: 56px;
+    border-radius: 4px;
+    margin-right: 16px;
+    border: 2px solid #f0f0f0;
+  }
+
+  .user-info {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+  }
+
+  .username {
+    font-size: 16px;
+    font-weight: bold;
+    color: var(--dark-color);
+    margin-bottom: 4px;
+  }
+
+  .time {
+    font-size: 12px;
+    color: var(--gray-color);
+    margin-bottom: 4px;
+  }
+
   .text {
     font-size: 15px;
     line-height: 1.7;
     color: #444;
     white-space: pre-wrap;
+  }
+
+  /* 内容文本 */
+  .title {
+    font-size: 22px;
+    color: var(--dark-color);
+    margin-bottom: 16px;
+    line-height: 1.4;
+    font-weight: 700;
+    padding-left: 12px;
+    border-left: 4px solid var(--secondary-color);
   }
 
 

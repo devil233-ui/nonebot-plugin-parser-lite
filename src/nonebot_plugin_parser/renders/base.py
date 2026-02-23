@@ -8,7 +8,7 @@ from collections.abc import AsyncGenerator
 import qrcode  # pyright: ignore[reportMissingModuleSource]
 from nonebot import logger
 
-from .utils import build_html, build_plain_text
+from .utils import build_html, build_plain_text, build_comments
 from ..config import pconfig, _nickname
 from ..helper import UniHelper, UniMessage, ForwardNodeInner
 from ..exception import DownloadException, ZeroSizeException, DownloadLimitException
@@ -17,6 +17,7 @@ from ..parsers.data import (
     AudioContent,
     ImageContent,
     MediaContent,
+    GraphicContent,
     VideoContent,
 )
 
@@ -59,28 +60,26 @@ class Renderer:
     async def send_content(
         self, result: ParseResult
     ) -> AsyncGenerator[UniMessage[Any], None]:
-        """发送媒体内容消息
+        """发送媒体内容消息。
 
-        Args:
-            result (ParseResult): 解析结果
-
-        Returns:
-            AsyncGenerator[UniMessage[Any], None]: 消息生成器
+        将解析结果中的媒体内容拆分为立即发送的音视频和可合并转发的图文，并处理延迟发送配置。
         """
-        failed_count = 0
         forwardable_segs: list[ForwardNodeInner] = []
-
-        # 用于存储延迟发送的媒体内容
         media_contents: list[MediaContent | Path] = []
+        failed_count = 0
+
+        need_delay = pconfig.delay_send_media or pconfig.delay_send_lazy_download
 
         for cont in result.content:
+            if not isinstance(cont, MediaContent) or not cont.need_send:
+                continue
+
             match cont:
                 case VideoContent() | AudioContent():
-                    need_delay = (
-                        pconfig.delay_send_media or pconfig.delay_send_lazy_download
+                    failed_delta, media = await self._handle_media_content(
+                        cont, need_delay
                     )
-                    failed, media = await self._handle_media_content(cont, need_delay)
-                    failed_count += failed
+                    failed_count += failed_delta
                     if media is not None:
                         media_contents.append(media)
                 case ImageContent():
@@ -92,9 +91,20 @@ class Renderer:
                     except DownloadException:
                         failed_count += 1
                         continue
-        if media_contents and (
-            pconfig.delay_send_media or pconfig.delay_send_lazy_download
-        ):
+                case GraphicContent():
+                    try:
+                        path = await cont.get_path()
+                        graphics_msg = UniHelper.img_seg(path)
+                        if cont.alt is not None:
+                            graphics_msg = graphics_msg + cont.alt
+                        forwardable_segs.append(graphics_msg)
+                    except (DownloadLimitException, ZeroSizeException):
+                        continue
+                    except DownloadException:
+                        failed_count += 1
+                        continue
+
+        if media_contents and need_delay:
             result.media_contents = media_contents
 
         if forwardable_segs:
@@ -182,7 +192,7 @@ class Renderer:
 
         if result.repost:
             self._build_result_with_repost(result, forwardable_segs, author_name)
-        elif plain := build_plain_text(result.content):
+        elif plain := build_plain_text(list(result.content)):
             forwardable_segs.append(f"{author_name}：{plain}")
 
     def _build_result_with_repost(
@@ -196,14 +206,14 @@ class Renderer:
             result.repost.author.name if result.repost.author else "未知用户"
         )
         forwardable_segs.append(
-            f"{author_name}[转发{repost_author}]：{build_plain_text(result.content)}"
+            f"{author_name}[转发{repost_author}]：{build_plain_text(list(result.content))}"
         )
 
         repost_text: list[str] = []
         if result.repost.title:
             repost_text.append(result.repost.title)
-        if result.repost.content:
-            repost_text.append(build_plain_text(result.repost.content))
+        if plain := build_plain_text(list(result.repost.content)):
+            repost_text.append(plain)
 
         if repost_text:
             repost_content = "\n".join(repost_text)
@@ -223,7 +233,7 @@ class Renderer:
         template_data = await self._resolve_parse_result(result)
 
         # 处理模板针对
-        template_name = "card.html.jinja"
+        template_name = "default.html.jinja"
         if result.platform:
             # 音乐平台使用音乐模板
             music_platforms = ["kugou", "netease", "kuwo", "qsmusic"]
@@ -273,11 +283,8 @@ class Renderer:
         """解析 ParseResult 为模板可用的字典数据"""
 
         logo_path = Path(__file__).parent / "resources" / f"{result.platform.name}.png"
-        content = await build_html(result.content)
-
-        # if ori := result.extra.get("origin"):
-        #     if oric := ori.get("contents"):
-        #         ori["contents"], _ = await self._build_contents(oric)
+        content = await build_html(list(result.content))
+        comments = await build_comments(result.comments)
         # 这些是一定会有的字段
         data: dict[str, Any] = {
             "title": result.title,
@@ -291,20 +298,16 @@ class Renderer:
             },
             "content": content,
             "cover_path": await result.cover_path,
-            "state": result.stats,
-            "comments": result.comments,
-            "build_html": build_html,
+            "stats": result.stats,
+            "comments": comments,
         }
 
         if result.author:
             avatar_path = await result.author.get_avatar_path()
-            author_id = getattr(result.author, "id", None)
-            if not author_id and result.extra:
-                author_id = result.extra.get("author_id")
 
             data["author"] = {
                 "name": result.author.name,
-                "id": author_id,  # 传递 UID
+                "id": result.author.id,  # 传递 UID
                 "avatar_path": avatar_path.as_uri() if avatar_path else None,
             }
 

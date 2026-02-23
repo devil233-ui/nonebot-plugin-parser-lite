@@ -94,7 +94,7 @@ class KuWoParser(BaseParser):
 
                 return self.result(
                     title=music_data["title"],
-                    author=self.create_author(music_data["artist"]),
+                    author=self.create_author(name=music_data["artist"]),
                     url=share_url,
                     content=contents,
                     extra=extra,

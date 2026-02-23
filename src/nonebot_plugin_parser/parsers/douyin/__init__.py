@@ -16,7 +16,9 @@ from ..base import (
 
 class DouyinParser(BaseParser):
     # 平台信息
-    platform: ClassVar[Platform] = Platform(name=PlatformEnum.DOUYIN, display_name="抖音")
+    platform: ClassVar[Platform] = Platform(
+        name=PlatformEnum.DOUYIN, display_name="抖音"
+    )
 
     # https://v.douyin.com/_2ljF4AmKL8
     @handle("v.douyin", r"v\.douyin\.com/[a-zA-Z0-9_\-]+")
@@ -97,7 +99,9 @@ class DouyinParser(BaseParser):
             contents.append(self.create_video(video_url, cover_url, duration))
 
         # 构建作者
-        author = self.create_author(video_data.author.nickname, video_data.avatar_url)
+        author = self.create_author(
+            name=video_data.author.nickname, avatar_url=video_data.avatar_url
+        )
 
         return self.result(
             title=video_data.desc,
@@ -130,7 +134,9 @@ class DouyinParser(BaseParser):
             contents.extend(self.create_videos(dynamic_urls))
 
         # 构建作者
-        author = self.create_author(slides_data.name, slides_data.avatar_url)
+        author = self.create_author(
+            name=slides_data.name, avatar_url=slides_data.avatar_url
+        )
 
         return self.result(
             title=slides_data.desc,

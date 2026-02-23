@@ -20,6 +20,8 @@ def repr_path_task(
 @dataclass(repr=False, slots=True)
 class MediaContent:
     path_task: Path | Task[Path] | Callable[[], Coroutine[Any, Any, Path]]
+    need_send: bool = True
+    """是否发送"""
 
     async def get_path(self) -> Path:
         if isinstance(self.path_task, Path):
@@ -76,7 +78,7 @@ class ImageContent(MediaContent):
 
 @dataclass(repr=False, slots=True)
 class GraphicContent(MediaContent):
-    """仅渲染图片,此图片不参与九宫格且不会被下载发送给用户"""
+    """图片，此图片不参与九宫格"""
 
     alt: str | None = None
     """图片描述 渲染时居中显示"""
@@ -111,12 +113,12 @@ class Author:
 
     name: str
     """作者名称"""
+    id: str | None = None
+    """作者id"""
     avatar: Path | Task[Path] | None = None
     """作者头像 URL 或本地路径"""
     description: str | None = None
     """作者个性签名等"""
-    id: str | int | None = None
-    """作者id"""
 
     async def get_avatar_path(self) -> Path | None:
         if self.avatar is None:
@@ -131,15 +133,15 @@ class Author:
 class Stats:
     """统计信息"""
 
-    view_count: int | None = None
+    view_count: str | None = None
     """浏览数"""
-    like_count: int | None = None
+    like_count: str | None = None
     """点赞数"""
-    collecte_count: int | None = None
+    collect_count: str | None = None
     """收藏数"""
-    share_count: int | None = None
+    share_count: str | None = None
     """分享数"""
-    comment_count: int | None = None
+    comment_count: str | None = None
     """评论数"""
     extra: dict[str, Any] = field(default_factory=dict)
     """额外信息, 比如弹幕数/硬币数"""
@@ -155,7 +157,7 @@ class Comment:
     """评论内容，可以是文本或媒体对象"""
     timestamp: int | None
     """发布时间戳，单位秒"""
-    state: Stats | None = None
+    stats: Stats = field(default_factory=Stats)
     """统计信息"""
     location: str | None = None
     """位置信息，可选"""
@@ -170,10 +172,10 @@ class Comment:
         self.replies.append(comment)
 
     @property
-    def formatted_datetime(self) -> str | None:
+    def formatted_datetime(self) -> str:
         """格式化时间戳"""
         if self.timestamp is None:
-            return None
+            return ""
         return datetime.fromtimestamp(self.timestamp).strftime("%Y-%m-%d %H:%M:%S")
 
 
@@ -193,7 +195,7 @@ class ParseResult:
     """来源链接"""
     content: Sequence[MediaContent | str | None] = field(default_factory=list)
     """资源/文本内容"""
-    stats: Stats | None = None
+    stats: Stats = field(default_factory=Stats)
     """统计信息"""
     comments: list[Comment] = field(default_factory=list)
     """评论列表"""
@@ -230,10 +232,10 @@ class ParseResult:
         return None
 
     @property
-    def formatted_datetime(self) -> str | None:
+    def formatted_datetime(self) -> str:
         """格式化时间戳"""
         if self.timestamp is None:
-            return None
+            return ""
         return datetime.fromtimestamp(self.timestamp).strftime("%Y-%m-%d %H:%M:%S")
 
     def __repr__(self) -> str:
@@ -244,6 +246,8 @@ class ParseResult:
             f"url: {self.url}, "
             f"author: {self.author}, "
             f"content: {self.content}, "
+            f"stats: {self.stats}, "
+            f"comments: {self.comments}, "
             f"extra: {self.extra}, "
             f"repost: {self.repost}, "
             f"render_image: {self.render_image.name if self.render_image else 'None'}"
@@ -265,3 +269,7 @@ class ParseResultKwargs(TypedDict, total=False):
     """额外信息"""
     repost: ParseResult | None
     """转发的内容"""
+    stats: Stats
+    """统计信息"""
+    comments: list[Comment]
+    """评论列表"""

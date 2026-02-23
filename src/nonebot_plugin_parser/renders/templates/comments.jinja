@@ -1,0 +1,101 @@
+{# 通用评论渲染片段，可在任意卡片模板中 include #}
+{% macro render_comments(result) %}
+{# 选择评论来源：优先当前卡片，其次转发内容 #}
+{% set comments = [] %}
+{% set repost = result.repost %}
+{% if result.comments %}
+{% set comments = result.comments %}
+{% elif repost and repost.comments %}
+{% set comments = repost.comments %}
+{% endif %}
+
+{% if comments and comments|length > 0 %}
+<div class="comments-section">
+    <div class="comments-header">
+        <i class="fas fa-comments"></i> 评论 ({{ comments|length }})
+    </div>
+
+    {% for comment in comments %}
+    <div class="comment-container">
+        <div class="comment-avatar-wrapper">
+            <img src="{{ comment.author.avatar_path }}" class="comment-avatar">
+        </div>
+
+        <div class="comment-content-wrapper">
+            <div class="comment-author-row">
+                <div class="comment-author-info">
+                    <span class="comment-author-name">{{ comment.author.name }}</span>
+                </div>
+                <span class="comment-time">{{ comment.formatted_datetime }}</span>
+            </div>
+
+            <div class="comment-text">
+                {{ comment.content | safe }}
+            </div>
+
+            <div class="comment-stats">
+                {% if comment.stats.like_count %}
+                <span class="comment-stat">
+                    <i class="fas fa-thumbs-up"></i>
+                    <span>{{ comment.stats.like_count }}</span>
+                </span>
+                {% endif %}
+                {% if comment.stats.comment_count %}
+                <span class="comment-stat">
+                    <i class="fas fa-reply"></i>
+                    <span>{{ comment.stats.comment_count }}</span>
+                </span>
+                {% endif %}
+                {% if comment.location %}
+                <span class="comment-stat">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <span>{{ comment.location }}</span>
+                </span>
+                {% endif %}
+            </div>
+
+            {% if comment.replies and comment.replies|length > 0 %}
+            <div class="comment-replies">
+                {% for reply in comment.replies %}
+                <div class="reply-container">
+                    <div class="reply-avatar-wrapper">
+                        <img src="{{ reply.author.avatar_path }}" alt="回复者头像" class="reply-avatar">
+                    </div>
+
+                    <div class="reply-content-wrapper">
+                        <div class="reply-author-row">
+                            <div class="reply-author-info">
+                                <span class="reply-author-name">{{ reply.author.name }}</span>
+                            </div>
+                            <span class="reply-time">{{ reply.formatted_datetime }}</span>
+                        </div>
+
+                        <div class="reply-text">
+                            {{ reply.content | safe }}
+                        </div>
+
+                        <div class="comment-stats">
+                            {% if reply.stats.like_count %}
+                            <span class="comment-stat">
+                                <i class="fas fa-thumbs-up"></i>
+                                <span>{{ reply.stats.like_count }}</span>
+                            </span>
+                            {% endif %}
+                            {% if reply.location %}
+                            <span class="comment-stat">
+                                <i class="fas fa-map-marker-alt"></i>
+                                <span>{{ reply.location }}</span>
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endmacro %}

@@ -14,7 +14,9 @@ class KuaiShouParser(BaseParser):
     """快手解析器"""
 
     # 平台信息
-    platform: ClassVar[Platform] = Platform(name=PlatformEnum.KUAISHOU, display_name="快手")
+    platform: ClassVar[Platform] = Platform(
+        name=PlatformEnum.KUAISHOU, display_name="快手"
+    )
 
     def __init__(self):
         super().__init__()
@@ -35,7 +37,9 @@ class KuaiShouParser(BaseParser):
         # /fw/long-video/ 返回结果不一样, 统一替换为 /fw/photo/ 请求
         real_url = real_url.replace("/fw/long-video/", "/fw/photo/")
 
-        async with AsyncClient(headers=self.ios_headers, timeout=self.timeout) as client:
+        async with AsyncClient(
+            headers=self.ios_headers, timeout=self.timeout
+        ) as client:
             response = await client.get(real_url)
             response.raise_for_status()
             response_text = response.text
@@ -58,14 +62,16 @@ class KuaiShouParser(BaseParser):
 
         # 添加视频内容
         if video_url := photo.video_url:
-            contents.append(self.create_video(video_url, photo.cover_url, photo.duration))
+            contents.append(
+                self.create_video(video_url, photo.cover_url, photo.duration)
+            )
 
         # 添加图片内容
         if img_urls := photo.img_urls:
             contents.extend(self.create_images(img_urls))
 
         # 构建作者
-        author = self.create_author(photo.name, photo.headUrl)
+        author = self.create_author(name=photo.name, avatar_url=photo.headUrl)
 
         return self.result(
             title=photo.caption,

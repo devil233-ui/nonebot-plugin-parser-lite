@@ -158,7 +158,7 @@ class NCMParser(BaseParser):
 
         return self.result(
             title=result["title"],
-            author=self.create_author(result["author"]),
+            author=self.create_author(name=result["author"]),
             url=share_url,
             content=contents,
             extra=extra,

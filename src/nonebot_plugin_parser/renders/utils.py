@@ -1,5 +1,4 @@
-from typing import Any, cast, overload
-from collections.abc import Mapping, Sequence
+from typing import Any
 
 from markupsafe import escape
 
@@ -7,56 +6,20 @@ from ..parsers.data import (
     ImageContent,
     MediaContent,
     StickerContent,
+    Comment,
     GraphicContent,
 )
 
 
-@overload
-def build_images(
-    img_list: list[str],
-    max_visible: int = 9,
-) -> str: ...
-@overload
-def build_images(
-    img_list: list[Mapping[str, Any]],
-    max_visible: int = 9,
-    *,
-    key: str,
-) -> str: ...
-def build_images(
-    img_list: list[str] | list[Mapping[str, Any]],
-    max_visible: int = 9,
-    *,
-    key: str | None = None,
-) -> str:
+def build_images(img_list: list[str]) -> str:
     """根据图片数量构建单/双/四宫格/九宫格 HTML.
 
-    - 支持传入字符串列表: list[str]
-    - 支持传入字典列表: list[Mapping]，需要指定 key 作为图片链接字段
-
-    :param img_list: 图片 src 列表，或字典列表
-    :param max_visible: 最多展示的图片数量，超出的会叠加为 +N
-    :param key: 当 img_list 为字典列表时，指定图片链接字段名
+    :param img_list: 图片 url 列表
     """
     if not img_list:
         return ""
 
-    img_src_list: list[str] = []
-    # 统一转换成 src 字符串列表
-    if isinstance(img_list[0], str):
-        img_src_list = img_list  # type: ignore[assignment]
-    else:
-        if not key:
-            raise ValueError("当传入字典列表时必须指定 key 参数作为图片链接字段名")
-        mapping_list = cast(Sequence[Mapping[str, Any]], img_list)
-        for item in mapping_list:
-            if value := item.get(key):
-                img_src_list.append(value)
-
-    if not img_src_list:
-        return ""
-
-    count = len(img_src_list)
+    count = len(img_list)
     if count == 1:
         grid_class = "single"
     elif count == 2:
@@ -69,8 +32,8 @@ def build_images(
         grid_class = "single"
 
     # 最多展示 max_visible 张，超出的收纳为 +N
-    max_visible = max(1, max_visible)
-    visible_imgs = img_src_list[:max_visible]
+    max_visible = 9
+    visible_imgs = img_list[:max_visible]
     hidden_count = max(0, count - max_visible)
 
     items_html: list[str] = []
@@ -91,7 +54,7 @@ def build_images(
     )
 
 
-async def build_html(content: Sequence[MediaContent | str | None]) -> str:
+async def build_html(content: list[MediaContent | str | None]) -> str:
     """构建模板可用的内容 HTML 字符串。
 
     文本、图片、表情、graphics 在这里直接拼成完整 HTML
@@ -111,6 +74,7 @@ async def build_html(content: Sequence[MediaContent | str | None]) -> str:
             current_imgs = []
 
     total = len(content)
+    first_text_seen = False
 
     for idx, cont in enumerate(content):
         if isinstance(cont, ImageContent):
@@ -128,11 +92,13 @@ async def build_html(content: Sequence[MediaContent | str | None]) -> str:
             )
 
             if isinstance(cont, str):
-                # 只要前后任意一侧是贴纸，就用 span；否则用 p
-                if prev_is_sticker or next_is_sticker:
+                # 第一个文本一定使用 span，之后只要前后任意一侧是贴纸就用 span；否则用 p
+                is_first_text = not first_text_seen
+                if is_first_text or prev_is_sticker or next_is_sticker:
                     html_parts.append(f'<span class="text">{cont}</span>')
                 else:
                     html_parts.append(f'<p class="text">{cont}</p>')
+                first_text_seen = True
 
             elif isinstance(cont, GraphicContent):
                 g_path = await cont.get_path()
@@ -150,7 +116,7 @@ async def build_html(content: Sequence[MediaContent | str | None]) -> str:
             elif isinstance(cont, StickerContent):
                 s_path = await cont.get_path()
                 s_src = s_path.as_uri()
-                size = cont.size or "medium"
+                size = cont.size
                 html_parts.append(f'<img class="sticker {size}" src="{s_src}">')
 
     # 末尾如果还有图片段，补一次 flush
@@ -158,7 +124,28 @@ async def build_html(content: Sequence[MediaContent | str | None]) -> str:
     return "".join(html_parts)
 
 
-def build_plain_text(content: Sequence[MediaContent | str | None]) -> str:
+def build_plain_text(content: list[MediaContent | str | None]) -> str:
     """构建纯文本内容"""
 
     return "".join("\n" + escape(c) for c in content if isinstance(c, str) and c)
+
+
+async def build_comments(comment_list: list[Comment]) -> list[dict[str, Any]]:
+    comments: list[dict[str, Any]] = []
+    for comment in comment_list:
+        avatar_path = await comment.author.get_avatar_path()
+        comments.append(
+            {
+                "author": {
+                    "name": comment.author.name,
+                    "id": comment.author.id,  # 传递 UID
+                    "avatar_path": avatar_path.as_uri() if avatar_path else None,
+                },
+                "content": await build_html(list(comment.content)),
+                "formatted_datetime": comment.formatted_datetime,
+                "stats": comment.stats,
+                "location": comment.location,
+                "replies": await build_comments(comment.replies),
+            }
+        )
+    return comments

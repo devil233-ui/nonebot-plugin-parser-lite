@@ -81,7 +81,7 @@ class QSMusicParser(BaseParser):
 
                 return self.result(
                     title=music_data["albumname"],
-                    author=self.create_author(music_data["artistsname"]),
+                    author=self.create_author(name=music_data["artistsname"]),
                     url=share_url,
                     content=contents,
                     extra=extra,

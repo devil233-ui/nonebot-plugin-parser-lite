@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Media Card</title>
+  {% include "share.html" %}
+  {% from "comments.jinja" import render_comments %}
+</head>
+
+<body>
+  {% macro render_card(result, is_repost=False) %}
+  {# --- 封面区域 --- #}
+  {% set cover_url = result.cover_path %}
+
+  <div class="card">
+    {% if not is_repost %}
+    <div class="decorative-stripe"></div>
+    {% endif %}
+
+    {% if cover_url %}
+    <div class="cover-section">
+      <img src="{{ cover_url }}" class="cover-image" alt="Cover">
+      <div class="cover-overlay"></div>
+    </div>
+    {% endif %}
+    <div class="content-section">
+      {# Header #} {% if result.author %}
+      <div class="header">
+        {% if result.author.avatar_path %}
+        <img src="{{ result.author.avatar_path }}" class="avatar" alt="avatar" />
+        {% endif %}
+        <div class="user-info">
+          <div class="username">{{ result.author.name }}</div>
+          {% if result.formatted_datetime %}
+          <div class="time">{{ result.formatted_datetime }}</div>
+          {% endif %}
+        </div>
+
+        {# Platform Logo #}
+        {% if not is_repost and result.platform and result.platform.logo_path %}
+        <img src="{{ result.platform.logo_path }}" class="platform-logo" alt="{{ result.platform.display_name }}">
+        {% endif %}
+
+        {# QR Code #}
+        {% if not is_repost and result.qr_code_path %}
+        <img src="{{ result.qr_code_path }}" class="qrcode" alt="QR Code"
+          style="width: 40px; height: 40px; border-radius: 4px; margin-left: auto;" />
+        {% endif %}
+      </div>
+      {% endif %}
+
+      {# Title #} {% if result.title %}
+      <div class="title">{{ result.title }}</div>
+      {% endif %}
+
+      {# Text #}
+      <div>{{ result.content | safe }}</div>
+      {# Repost #} {% if result.repost %} {{
+      render_card(result.repost, is_repost=True) }} {% endif %}
+    </div>
+    {# --- 评论区 --- #}
+    {{ render_comments(result) }}
+    {# --- 底部 --- #}
+    {% if not is_repost %}
+    <div class="footer-section">
+      <div class="footer-brand">
+        <i class="fas fa-layer-group"></i>
+        <span>{{ bot_name }} Parser</span>
+      </div>
+      <div class="footer-info">
+        <i class="fas fa-clock" style="margin-right: 4px;"></i>
+        <span>Rendering at {{ rendering_time }}</span>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  </div>
+  {% endmacro %} {{ render_card(result) }}
+</body>
+
+</html>

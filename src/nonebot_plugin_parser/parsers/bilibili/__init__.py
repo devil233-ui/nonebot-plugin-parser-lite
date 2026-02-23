@@ -4,7 +4,6 @@ import asyncio
 import contextlib
 from re import Match
 from typing import Any, ClassVar
-from datetime import datetime
 from collections.abc import AsyncGenerator
 
 import httpx
@@ -36,12 +35,11 @@ from ..base import (
     handle,
     pconfig,
 )
-from ..data import Platform, ImageContent, MediaContent
+from ..data import Author, Comment, Platform, MediaContent, Stats
 from .video import VideoInfo, AIConclusion
 from ..cookie import ck2dict
 from .dynamic import DynamicData, DynamicInfo
 from .favlist import FavData
-from ...renders.utils import build_images
 
 # 选择客户端
 select_client("curl_cffi")
@@ -52,7 +50,9 @@ request_settings.set("impersonate", "chrome131")
 
 class BilibiliParser(BaseParser):
     # 平台信息
-    platform: ClassVar[Platform] = Platform(name=PlatformEnum.BILIBILI, display_name="哔哩哔哩")
+    platform: ClassVar[Platform] = Platform(
+        name=PlatformEnum.BILIBILI, display_name="哔哩哔哩"
+    )
 
     def __init__(self):
         self.headers = HEADERS.copy()
@@ -177,7 +177,11 @@ class BilibiliParser(BaseParser):
         # 获取简介
         text = f"简介: {video_info.desc}" if video_info.desc else ""
         # up
-        author = self.create_author(video_info.owner.name, video_info.owner.face)
+        author = self.create_author(
+            name=video_info.owner.name,
+            avatar_url=video_info.owner.face,
+            id=str(video_info.owner.mid),
+        )
         # 处理分 p
         page_info = video_info.extract_info_with_page(page_num)
 
@@ -198,7 +202,9 @@ class BilibiliParser(BaseParser):
             output_path = pconfig.cache_dir / f"{video_info.bvid}-{page_num}.mp4"
             if output_path.exists():
                 return output_path
-            v_url, a_url = await self.extract_download_urls(video=video, page_index=page_info.index)
+            v_url, a_url = await self.extract_download_urls(
+                video=video, page_index=page_info.index
+            )
             if page_info.duration > pconfig.duration_maximum:
                 raise DurationLimitException
             if a_url is not None:
@@ -206,7 +212,9 @@ class BilibiliParser(BaseParser):
                     v_url, a_url, output_path=output_path, ext_headers=self.headers
                 )
             else:
-                return await DOWNLOADER.streamd(v_url, file_name=output_path.name, ext_headers=self.headers)
+                return await DOWNLOADER.streamd(
+                    v_url, file_name=output_path.name, ext_headers=self.headers
+                )
 
         # 创建视频下载内容（传递下载函数而非立即执行）
         video_content = self.create_video(
@@ -216,17 +224,17 @@ class BilibiliParser(BaseParser):
         )
 
         # 提取统计数据
-        stats = {}
+        stats = self.create_stats()
         try:
             if video_info.stat:
-                stats = {
-                    "play": self._format_stat(video_info.stat.view),
+                stats.view_count = self._format_stat(video_info.stat.view)
+                stats.like_count = self._format_stat(video_info.stat.like)
+                stats.collect_count = self._format_stat(video_info.stat.favorite)
+                stats.share_count = self._format_stat(video_info.stat.share)
+                stats.comment_count = self._format_stat(video_info.stat.reply)
+                stats.extra = {
                     "danmaku": self._format_stat(video_info.stat.danmaku),
-                    "like": self._format_stat(video_info.stat.like),
                     "coin": self._format_stat(video_info.stat.coin),
-                    "favorite": self._format_stat(video_info.stat.favorite),
-                    "share": self._format_stat(video_info.stat.share),
-                    "reply": self._format_stat(video_info.stat.reply),
                 }
                 logger.debug(f"[BiliParser] 视频统计数据: {stats}")
         except Exception as e:
@@ -255,13 +263,10 @@ class BilibiliParser(BaseParser):
         # 构造 extra_data
         extra_data = {
             "info": ai_summary,
-            "stats": stats,
             "type": "video",
             "type_tag": "视频",
             "type_icon": "fa-circle-play",
-            "author_id": str(video_info.owner.mid),
             "content_id": video_info.bvid,
-            "comments": processed_comments,
         }
         logger.debug(f"Video extra data: {extra_data}")
 
@@ -271,6 +276,8 @@ class BilibiliParser(BaseParser):
             timestamp=page_info.timestamp,
             author=author,
             content=[text, video_content],
+            stats=stats,
+            comments=processed_comments,
             extra=extra_data,
         )
 
@@ -289,25 +296,25 @@ class BilibiliParser(BaseParser):
         dynamic_info = convert(dynamic_info_data, DynamicData).item
 
         # 作者
-        author = self.create_author(dynamic_info.name, dynamic_info.avatar)
+        author = self.create_author(
+            name=dynamic_info.name,
+            avatar_url=dynamic_info.avatar,
+            id=str(dynamic_info.modules.module_author.mid),
+        )
 
         # 标题 & 文本
         dynamic_title = dynamic_info.title
-        dynamic_text = dynamic_info.text
-        plain_text = dynamic_text if dynamic_text and dynamic_text != dynamic_title else ""
 
         # 主体内容：文字 + 图片
-        contents: list[MediaContent | str] = [plain_text]
+        contents: list[MediaContent | str] = []
         contents.extend(await self._build_dynamic_contents(dynamic_info))
         # 统计数据
         stats = self._extract_dynamic_stats(dynamic_info)
 
         extra_data: dict[str, Any] = {
-            "stats": stats,
             "type": "dynamic",
             "type_tag": "动态",
             "type_icon": "fa-quote-left",
-            "author_id": str(dynamic_info.modules.module_author.mid),
             "content_id": str(dynamic_id),
         }
 
@@ -318,9 +325,10 @@ class BilibiliParser(BaseParser):
         dynamic_url = f"https://t.bilibili.com/{dynamic_id}"
 
         # 评论
-        comments = await self._fetch_dynamic_comments_safe(dynamic_id, dynamic_info, dynamic_info_data)
+        comments = await self._fetch_dynamic_comments_safe(
+            dynamic_id, dynamic_info, dynamic_info_data
+        )
         if comments:
-            extra_data["comments"] = comments
             logger.debug(f"[BiliParser] 成功获取 {len(comments)} 条动态评论")
         else:
             logger.debug("[BiliParser] 未获取到动态评论")
@@ -331,11 +339,15 @@ class BilibiliParser(BaseParser):
             timestamp=dynamic_info.timestamp,
             author=author,
             content=contents,
+            comments=comments,
             extra=extra_data,
             repost=repost_result,
+            stats=stats,
         )
 
-    async def _build_dynamic_contents(self, dynamic_info: DynamicInfo) -> list[MediaContent | str]:
+    async def _build_dynamic_contents(
+        self, dynamic_info: DynamicInfo
+    ) -> list[MediaContent | str]:
         """构建动态主体 contents：文字 + 图片"""
         contents: list[MediaContent | str] = []
         for node in dynamic_info.rich_text_nodes:
@@ -348,23 +360,31 @@ class BilibiliParser(BaseParser):
         contents.extend(self.create_images(dynamic_info.image_urls))
         return contents
 
-    def _extract_dynamic_stats(self, dynamic_info: DynamicInfo) -> dict[str, str]:
+    def _extract_dynamic_stats(self, dynamic_info: DynamicInfo) -> Stats:
         """提取动态统计数据"""
-        stats: dict[str, str] = {}
+        stats = self.create_stats()
         with contextlib.suppress(Exception):
             if dynamic_info.modules.module_stat:
                 m_stat = dynamic_info.modules.module_stat
-                stats = {
-                    "like": self._format_stat(m_stat.get("like", {}).get("count", 0)),
-                    "reply": self._format_stat(m_stat.get("comment", {}).get("count", 0)),
-                    "share": self._format_stat(m_stat.get("forward", {}).get("count", 0)),
-                    "favorite": self._format_stat(m_stat.get("favorite", {}).get("count", 0)),
-                }
+                stats.like_count = self._format_stat(
+                    m_stat.get("like", {}).get("count", 0)
+                )
+                stats.comment_count = self._format_stat(
+                    m_stat.get("comment", {}).get("count", 0)
+                )
+                stats.share_count = self._format_stat(
+                    m_stat.get("forward", {}).get("count", 0)
+                )
+                stats.collect_count = self._format_stat(
+                    m_stat.get("favorite", {}).get("count", 0)
+                )
             modules = dynamic_info.modules
-            if hasattr(modules, "module_author") and hasattr(modules.module_author, "views_text"):
+            if hasattr(modules, "module_author") and hasattr(
+                modules.module_author, "views_text"
+            ):
                 views_value = modules.module_author.views_text
                 if views_value is not None:
-                    stats["play"] = views_value
+                    stats.view_count = views_value
         return stats
 
     async def _resolve_repost(self, dynamic_info: DynamicInfo):
@@ -381,7 +401,9 @@ class BilibiliParser(BaseParser):
         major_type, opus_jump_url, archive_bvid = self._get_repost_major_type(orig_item)
 
         # 目前封面只是预留，暂无使用
-        _ = orig_item.cover_url or (orig_item.image_urls[0] if orig_item.image_urls else None)
+        _ = orig_item.cover_url or (
+            orig_item.image_urls[0] if orig_item.image_urls else None
+        )
 
         # 图文 / 专栏
         # if major_type == "OPUS" and opus_jump_url:
@@ -457,9 +479,13 @@ class BilibiliParser(BaseParser):
         dynamic_info_data: dict[str, Any],
     ):
         """统一封装动态评论获取逻辑，减少 parse_dynamic_or_opus 的分支复杂度"""
-        oid, ctype = self._resolve_comment_params(dynamic_id, dynamic_info, dynamic_info_data)
+        oid, ctype = self._resolve_comment_params(
+            dynamic_id, dynamic_info, dynamic_info_data
+        )
         comments = await self._fetch_comments(oid, ctype)
-        logger.debug(f"[BiliParser] 动态评论参数: oid={oid}, type={ctype}, got={len(comments)}")
+        logger.debug(
+            f"[BiliParser] 动态评论参数: oid={oid}, type={ctype}, got={len(comments)}"
+        )
         return comments
 
     def _resolve_comment_params(
@@ -477,7 +503,11 @@ class BilibiliParser(BaseParser):
             return int(comment_id_str), int(comment_type)
 
         # 2. 再根据 major_type 猜测
-        major_info = dynamic_info.modules.major_info if hasattr(dynamic_info.modules, "major_info") else {}
+        major_info = (
+            dynamic_info.modules.major_info
+            if hasattr(dynamic_info.modules, "major_info")
+            else {}
+        )
         major_type = major_info.get("type") if isinstance(major_info, dict) else None
 
         if major_type == "MAJOR_TYPE_ARCHIVE" and major_info:
@@ -552,7 +582,9 @@ class BilibiliParser(BaseParser):
         if not author_name and hasattr(opus_data, "name_avatar"):
             author_name, author_face = opus_data.name_avatar
 
-        author = self.create_author(author_name, author_face)
+        author = self.create_author(
+            name=author_name, id=author_mid, avatar_url=author_face
+        )
 
         # 按顺序处理图文内容（参考 parse_read 的逻辑）
         contents: list[MediaContent | str] = []
@@ -566,31 +598,38 @@ class BilibiliParser(BaseParser):
                 contents.append(node.text)
 
         # 提取统计数据
-        stats = {}
+        stats = self.create_stats()
         with contextlib.suppress(Exception):
             if hasattr(opus_data.item, "modules"):
                 for module in opus_data.item.modules:
                     if module.module_type == "MODULE_TYPE_STAT" and module.module_stat:
                         st = module.module_stat
-                        stats = {
-                            "like": self._format_stat(st.get("like", {}).get("count", 0)),
-                            "reply": self._format_stat(st.get("comment", {}).get("count", 0)),
-                            "share": self._format_stat(st.get("forward", {}).get("count", 0)),
-                            "favorite": self._format_stat(st.get("favorite", {}).get("count", 0)),
-                        }
+                        stats.like_count = self._format_stat(
+                            st.get("like", {}).get("count", 0)
+                        )
+                        stats.comment_count = self._format_stat(
+                            st.get("comment", {}).get("count", 0)
+                        )
+                        stats.share_count = self._format_stat(
+                            st.get("forward", {}).get("count", 0)
+                        )
+                        stats.collect_count = self._format_stat(
+                            st.get("favorite", {}).get("count", 0)
+                        )
                     # 检查是否有浏览量字段
-                    elif module.module_type == "MODULE_TYPE_AUTHOR" and module.module_author:
+                    elif (
+                        module.module_type == "MODULE_TYPE_AUTHOR"
+                        and module.module_author
+                    ):
                         if hasattr(module.module_author, "views_text"):
                             views_value = module.module_author.views_text
                             if views_value is not None:
-                                stats["play"] = views_value
+                                stats.view_count = views_value
         # 构造 Extra 数据
         extra_data = {
-            "stats": stats,
             "type": "opus",
             "type_tag": "图文",
             "type_icon": "fa-file-pen",
-            "author_id": author_mid,
             "content_id": opus_data.item.id_str,
         }
 
@@ -602,8 +641,6 @@ class BilibiliParser(BaseParser):
         opus_id = bili_opus.get_opus_id()
         opus_url = f"https://www.bilibili.com/opus/{opus_id}"
 
-        # 获取评论数据 - _fetch_comments方法已经处理好所有数据
-        comments = None
         # 获取opus原始数据，用于提取评论参数
         opus_info = await bili_opus.get_info() if hasattr(bili_opus, "get_info") else {}
         # 确保opus_info是字典类型
@@ -624,16 +661,21 @@ class BilibiliParser(BaseParser):
         if comment_id_str and comment_type:
             # 使用opus数据中提供的comment_id_str和comment_type
             comments = await self._fetch_comments(int(comment_id_str), comment_type)
-            logger.debug(f"[BiliParser] 使用opus数据中提供的评论参数: oid={comment_id_str}, type={comment_type}")
+            logger.debug(
+                f"[BiliParser] 使用opus数据中提供的评论参数: oid={comment_id_str}, type={comment_type}"
+            )
         else:
             content_id = str(opus_data.item.id_str)
 
             # 默认为图文动态，使用content_id作为oid，type=12
-            comments = await self._fetch_comments(int(content_id), 12)  # type=12 表示专栏/图文
-            logger.debug(f"[BiliParser] 使用content_id作为opus评论参数: oid={content_id}, type=12")
+            comments = await self._fetch_comments(
+                int(content_id), 12
+            )  # type=12 表示专栏/图文
+            logger.debug(
+                f"[BiliParser] 使用content_id作为opus评论参数: oid={content_id}, type=12"
+            )
 
         if comments:
-            extra_data["comments"] = comments
             logger.debug(f"[BiliParser] 成功获取 {len(comments)} 条专栏/图文评论")
         else:
             logger.debug("[BiliParser] 未获取到专栏/图文评论")
@@ -644,6 +686,8 @@ class BilibiliParser(BaseParser):
             author=author,
             timestamp=opus_data.timestamp,
             content=contents,
+            stats=stats,
+            comments=comments,
             extra=extra_data,
         )
 
@@ -665,15 +709,13 @@ class BilibiliParser(BaseParser):
         contents: list[MediaContent | str] = [room_data.detail]
         # 下载封面
         if cover := room_data.cover:
-            cover_task = DOWNLOADER.download_img(cover, ext_headers=self.headers)
-            contents.append(ImageContent(cover_task))
+            contents.append(self.create_image(cover))
 
         # 下载关键帧
         if keyframe := room_data.keyframe:
-            keyframe_task = DOWNLOADER.download_img(keyframe, ext_headers=self.headers)
-            contents.append(ImageContent(keyframe_task))
+            contents.append(self.create_image(keyframe))
 
-        author = self.create_author(room_data.name, room_data.avatar)
+        author = self.create_author(name=room_data.name, avatar_url=room_data.avatar)
 
         url = f"https://www.bilibili.com/blackboard/live/live-activity-player.html?enterTheRoom=0&cid={room_id}"
 
@@ -719,11 +761,17 @@ class BilibiliParser(BaseParser):
         return self.result(
             title=favdata.title,
             timestamp=favdata.timestamp,
-            author=self.create_author(favdata.info.upper.name, favdata.info.upper.face),
-            content=[self.create_graphic(fav.cover, fav.desc) for fav in favdata.medias],
+            author=self.create_author(
+                name=favdata.info.upper.name, avatar_url=favdata.info.upper.face
+            ),
+            content=[
+                self.create_graphic(fav.cover, fav.desc) for fav in favdata.medias
+            ],
         )
 
-    async def _get_video(self, *, bvid: str | None = None, avid: int | None = None) -> Video:
+    async def _get_video(
+        self, *, bvid: str | None = None, avid: int | None = None
+    ) -> Video:
         """解析视频信息
 
         Args:
@@ -768,7 +816,9 @@ class BilibiliParser(BaseParser):
         video_stream = streams[0]
         if not isinstance(video_stream, VideoStreamDownloadURL):
             raise DownloadException("未找到可下载的视频流")
-        logger.debug(f"视频流质量: {video_stream.video_quality.name}, 编码: {video_stream.video_codecs}")
+        logger.debug(
+            f"视频流质量: {video_stream.video_quality.name}, 编码: {video_stream.video_codecs}"
+        )
 
         audio_stream = streams[1]
         if not isinstance(audio_stream, AudioStreamDownloadURL):
@@ -788,7 +838,9 @@ class BilibiliParser(BaseParser):
         if not self._cookies_file.exists():
             return
 
-        self._credential = Credential.from_cookies(json.loads(self._cookies_file.read_text()))
+        self._credential = Credential.from_cookies(
+            json.loads(self._cookies_file.read_text())
+        )
 
     async def login_with_qrcode(self) -> bytes:
         """通过二维码登录获取哔哩哔哩登录凭证"""
@@ -836,13 +888,15 @@ class BilibiliParser(BaseParser):
             logger.info(f"`parser_bili_ck` 已过期, 尝试从 {self._cookies_file} 加载")
             self._load_credential()
 
-    async def _fetch_comments(self, oid: int, type: int) -> list[dict[str, Any]]:
+    async def _fetch_comments(self, oid: int, type: int) -> list[Comment]:
         """从 Bilibili API 获取评论数据，优先热评，失败时兜底普通评论"""
         # 构造请求头（带 cookie）
         request_headers = self.headers.copy()
         if self._credential:
             if cookies := self._credential.get_cookies():
-                request_headers["Cookie"] = "; ".join(f"{k}={v}" for k, v in cookies.items())
+                request_headers["Cookie"] = "; ".join(
+                    f"{k}={v}" for k, v in cookies.items()
+                )
 
         async with httpx.AsyncClient(timeout=10.0) as client:
             # 1. 热评接口
@@ -898,7 +952,7 @@ class BilibiliParser(BaseParser):
         params: dict[str, Any],
         headers: dict[str, str],
         desc: str,
-    ) -> list[dict[str, Any]]:
+    ) -> list[Comment]:
         """请求指定评论 API，并解析为标准评论列表格式。"""
         logger.debug(f"{desc}: url={api_url}, 参数={params}")
         response = await client.get(api_url, params=params, headers=headers)
@@ -907,7 +961,9 @@ class BilibiliParser(BaseParser):
         logger.debug(f"{desc} 返回: {data}")
 
         if data.get("code") != 0 or not data.get("data"):
-            logger.debug(f"{desc} 返回数据为空或错误: code={data.get('code')}, message={data.get('message')}")
+            logger.debug(
+                f"{desc} 返回数据为空或错误: code={data.get('code')}, message={data.get('message')}"
+            )
             return []
 
         replies = data["data"].get("replies")
@@ -918,21 +974,21 @@ class BilibiliParser(BaseParser):
         logger.debug(f"{desc} 获得评论: {len(replies)} 条")
         return self._process_reply_list(replies)
 
-    def _render_message_with_emote(self, raw: str, emote: dict[str, Any]) -> str:
-        """将原始 message + emote 渲染为 HTML:
-        - 普通文本用 <span> 包裹
-        - 表情用 <img> 插入
-        支持同一表情多次出现 / 连续表情。
-        仅对 raw 做一次线性扫描，减少多次 find。
-        """
+    def _format_content_with_emote(
+        self, raw: str, emote: dict[str, Any]
+    ) -> list[str | MediaContent]:
+        """将原始 message + emote 渲染为媒体列表"""
         if not raw:
-            return ""
+            return [""]
         if not emote:
-            return f"<span class='text'>{raw}</span>"
+            return [raw]
 
         length = len(raw)
-        segments: list[tuple[int, int, str]] = []
+        cursor = 0
+        parts: list[str | MediaContent] = []
 
+        # 预处理所有可用表情：表情文本及封装好的 MediaContent
+        emote_entries: list[tuple[str, MediaContent]] = []
         for e in emote.values():
             if e.get("type") == 4:
                 continue
@@ -942,89 +998,92 @@ class BilibiliParser(BaseParser):
                 continue
 
             size = "small" if e.get("meta", {}).get("size") == 1 else "medium"
-            img_html = f'<img class="sticker {size}" src="{e.get("url","")}">'
+            sticker = self.create_sticker(e["url"], size)
+            emote_entries.append((text, sticker))
 
-            # 找到所有出现位置
-            start = 0
-            text = text
-            tlen = len(text)
-            while True:
-                idx = raw.find(text, start)
+        if not emote_entries:
+            return [raw]
+
+        while cursor < length:
+            best_pos = length  # 当前找到的最近表情位置
+            best_end = cursor
+            best_media: MediaContent | None = None
+
+            # 在 [cursor, length) 范围内寻找「起始位置最靠前」的一次表情命中
+            for text, media in emote_entries:
+                idx = raw.find(text, cursor, best_pos + len(text))
                 if idx == -1:
-                    break
-                end = idx + tlen
-                segments.append((idx, end, img_html))
-                start = end
+                    continue
 
-        if not segments:
-            return f"<span class='text'>{raw}</span>"
+                # 起始位置更靠前则更新；相同位置时略过，保持首次命中即可
+                if idx < best_pos:
+                    best_pos = idx
+                    best_end = idx + len(text)
+                    best_media = media
 
-        # 过滤非法段，排序
-        valid_segments = [(s, e, h) for s, e, h in segments if 0 <= s < e <= length]
-        if not valid_segments:
-            return f"<span class='text'>{raw}</span>"
+                    # 已经在 cursor 命中，无法再更早，直接退出
+                    if best_pos == cursor:
+                        break
 
-        valid_segments.sort(key=lambda x: x[0])
+            # 没找到任何后续表情，剩余部分整体作为文本
+            if best_media is None:
+                if tail := raw[cursor:]:
+                    parts.append(tail)
+                break
 
-        parts: list[str] = []
-        cursor = 0
-        for start, end, img_html in valid_segments:
-            if start > cursor:
-                if text_part := raw[cursor:start]:
-                    parts.append(f"<span class='text'>{text_part}</span>")
-            parts.append(img_html)
-            cursor = end
+            # 先追加文本段
+            if best_pos > cursor:
+                if text_part := raw[cursor:best_pos]:
+                    parts.append(text_part)
 
-        if cursor < length:
-            if tail := raw[cursor:]:
-                parts.append(f"<span class='text'>{tail}</span>")
+            # 再追加表情段
+            parts.append(best_media)
+            cursor = best_end
 
-        return "".join(parts)
+        return parts
 
-    def _process_reply_list(self, replies: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        """将 B 站评论列表转换为前端可直接使用的格式。"""
+    def _process_reply_list(self, replies: list[dict[str, Any]]) -> list[Comment]:
+        """将 B 站评论列表转换为 Comment 列表"""
 
-        def _build_single_comment(raw: dict[str, Any]) -> dict[str, Any]:
-            content = raw.get("content") or {}
+        def _build_single_comment(
+            raw: dict[str, Any], parent_author: Author | None = None
+        ) -> Comment:
+            reply_control = raw.get("reply_control", {})
+            content = raw.get("content", {})
             message = content.get("message", "")
-            emote = content.get("emote") or {}
-            processed_content = self._render_message_with_emote(message, emote)
+            emote = content.get("emote", {})
+            processed_content = self._format_content_with_emote(message, emote)
 
             if pictures := content.get("pictures"):
-                processed_content += build_images(
-                    pictures,
-                    max_visible=3,
-                    key="img_src",
-                )
+                for pic in pictures:
+                    if url := pic.get("img_src"):
+                        processed_content.append(self.create_image(url))
 
-            created_ts = raw.get("ctime", 0)
-            created_str = datetime.fromtimestamp(created_ts).strftime("%Y-%m-%d %H:%M:%S")
+            member = raw.get("member", {})
+            return self.create_comment(
+                author=self.create_author(
+                    name=member.get("uname", ""),
+                    avatar_url=member.get("avatar"),
+                ),
+                content=processed_content,
+                timestamp=raw.get("ctime", 0),
+                state=self.create_stats(like_count=raw.get("like", 0)),
+                location=reply_control.get("location"),
+                parent_author=parent_author,
+            )
 
-            member = raw.get("member") or {}
-            return {
-                "id": raw.get("rpid_str", ""),
-                "author": {
-                    "id": raw.get("mid", ""),
-                    "name": member.get("uname", ""),
-                    "avatar": member.get("avatar", ""),
-                },
-                "content": processed_content,
-                "created_time": created_str,
-                "like": raw.get("like", 0),
-            }
-
-        processed_comments: list[dict[str, Any]] = []
+        processed_comments: list[Comment] = []
 
         for comment in replies[:10]:
+            comment_obj = _build_single_comment(comment)
             # 子回复
-            child_posts: list[dict[str, Any]] = []
+            child_posts: list[Comment] = []
             replies_list = comment.get("replies") or []
             for reply in replies_list[:5]:
-                child_posts.append(_build_single_comment(reply))
+                child_posts.append(_build_single_comment(reply, comment_obj.author))
 
-            comment_obj = _build_single_comment(comment)
-            comment_obj["replies_count"] = comment.get("count", 0)
-            comment_obj["child_posts"] = child_posts
+            comment_obj.stats.comment_count = comment.get("count", 0)
+            comment_obj.replies = child_posts
 
             processed_comments.append(comment_obj)
 
@@ -1049,6 +1108,8 @@ class BilibiliParser(BaseParser):
                 logger.info(f"哔哩哔哩凭证刷新成功, 保存到 {self._cookies_file}")
                 self._save_credential()
             else:
-                logger.warning("哔哩哔哩凭证刷新需要包含 `SESSDATA`, `ac_time_value` 项")
+                logger.warning(
+                    "哔哩哔哩凭证刷新需要包含 `SESSDATA`, `ac_time_value` 项"
+                )
 
         return self._credential

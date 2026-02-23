@@ -26,7 +26,9 @@ from .video import decoder
 
 class AcfunParser(BaseParser):
     # 平台信息
-    platform: ClassVar[Platform] = Platform(name=PlatformEnum.ACFUN, display_name="猴山")
+    platform: ClassVar[Platform] = Platform(
+        name=PlatformEnum.ACFUN, display_name="猴山"
+    )
 
     def __init__(self):
         super().__init__()
@@ -38,7 +40,9 @@ class AcfunParser(BaseParser):
         url = f"https://www.acfun.cn/v/ac{acid}"
 
         video_info = await self.parse_video_info(url)
-        author = self.create_author(video_info.name, video_info.avatar_url)
+        author = self.create_author(
+            name=video_info.name, avatar_url=video_info.avatar_url
+        )
 
         video_task = asyncio.create_task(
             self.download_video(
@@ -84,7 +88,9 @@ class AcfunParser(BaseParser):
         raw = raw.replace('"{', "{").replace('}"', "}")
         return decoder.decode(raw)
 
-    async def download_video(self, m3u8_url: str, file_name: str, duration: int) -> Path:
+    async def download_video(
+        self, m3u8_url: str, file_name: str, duration: int
+    ) -> Path:
         """下载acfun视频
 
         Args:
@@ -115,7 +121,9 @@ class AcfunParser(BaseParser):
                     task_id = bar.task_ids[0]
                     for url in m3u8_slices:
                         async with client.stream("GET", url) as response:
-                            async for chunk in response.aiter_bytes(chunk_size=1024 * 1024):
+                            async for chunk in response.aiter_bytes(
+                                chunk_size=1024 * 1024
+                            ):
                                 await f.write(chunk)
                                 total_size += len(chunk)
                                 bar.advance(task_id, len(chunk))

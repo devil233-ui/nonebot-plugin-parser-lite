@@ -46,7 +46,9 @@ class NGAParser(BaseParser):
         tid = searched.group("tid")
         url = self.nga_url(tid)
 
-        async with AsyncClient(headers=self.headers, timeout=self.timeout, follow_redirects=True) as client:
+        async with AsyncClient(
+            headers=self.headers, timeout=self.timeout, follow_redirects=True
+        ) as client:
             try:
                 # 第一次请求可能返回403，但包含设置cookie的JavaScript
                 resp = await client.get(url)
@@ -108,7 +110,7 @@ class NGAParser(BaseParser):
                         # 使用提取的 uid 查找用户名
                         if uid in user_info:
                             author = user_info[uid].get("username")
-        author = self.create_author(author) if author else None
+        author = self.create_author(name=author) if author else None
         # 提取时间 - 从第一个帖子的 postdate0
         timestamp = None
         time_tag = soup.find(id="postdate0")
@@ -118,7 +120,7 @@ class NGAParser(BaseParser):
 
         # 提取文本 - postcontent0
         content_tag = soup.find(id="postcontent0")
-        contents: list[MediaContent|str] = []
+        contents: list[MediaContent | str] = []
         if content_tag and isinstance(content_tag, Tag):
             text = content_tag.get_text("\n", strip=True)
             # 清理 BBCode 标签并限制长度

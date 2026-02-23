@@ -12,7 +12,9 @@ from .explore import decoder as exploreDecoder
 
 class XiaoHongShuParser(BaseParser):
     # 平台信息
-    platform: ClassVar[Platform] = Platform(name=PlatformEnum.XIAOHONGSHU, display_name="小红书")
+    platform: ClassVar[Platform] = Platform(
+        name=PlatformEnum.XIAOHONGSHU, display_name="小红书"
+    )
     session: AsyncSession
     # 小红书笔记详情页对真实浏览器仍有速率限制，达到限制后需要时间恢复
     # 暂时不知ck能否缓解此问题
@@ -39,7 +41,9 @@ class XiaoHongShuParser(BaseParser):
         if pconfig.xhs_ck:
             self.headers["cookie"] = pconfig.xhs_ck
             self.ios_headers["cookie"] = pconfig.xhs_ck
-        self.session = AsyncSession(headers=self.headers, timeout=15, impersonate="chrome131")
+        self.session = AsyncSession(
+            headers=self.headers, timeout=15, impersonate="chrome131"
+        )
 
     @handle("xhslink.com", r"xhslink\.com/[A-Za-z0-9._?%&+=/#@-]+")
     async def _parse_short_link(self, searched: re.Match[str]):
@@ -112,10 +116,15 @@ class XiaoHongShuParser(BaseParser):
         elif image_urls:
             contents.extend(self.create_images(image_urls))
 
-        contents.extend(self.create_video(live_url, live_cover_url) for live_url, live_cover_url in live_urls)
-        author = self.create_author(author_name, author_avatar)
+        contents.extend(
+            self.create_video(live_url, live_cover_url)
+            for live_url, live_cover_url in live_urls
+        )
+        author = self.create_author(name=author_name, avatar_url=author_avatar)
 
-        return self.result(title=title, author=author, content=contents, timestamp=timestamp)
+        return self.result(
+            title=title, author=author, content=contents, timestamp=timestamp
+        )
 
     async def parse_explore(self, url: str, note_id: str):
         init_state = await self._fetch_initial_state(url)
