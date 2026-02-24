@@ -6,7 +6,9 @@ RE_PATH = re.compile(r"0sftu[^.\-@]*")
 RE_ID = re.compile(r"[0-9:;<=>?]{8,}")
 
 # 预生成静态映射表 (O(1) 查找速度)
-T1 = str.maketrans("".join(chr(i) for i in range(256)), "".join(chr((i - 1) % 256) for i in range(256)))
+T1 = str.maketrans(
+    "".join(chr(i) for i in range(256)), "".join(chr((i - 1) % 256) for i in range(256))
+)
 
 
 def get_final_stable_path_ultimate(text):

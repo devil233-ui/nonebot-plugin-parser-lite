@@ -99,6 +99,6 @@ class Data(Struct):
     info: Info = field(name="/rest/wd/ugH5App/photo/simple/info")
     """视频/图集信息"""
     comments: dict | None = field(default=None, name="/rest/wd/photo/comment/list")
-    """评论信息
+    """评论信息，为页面二次加载赋值
     > TODO: 待完善模型
     """

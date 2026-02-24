@@ -8,6 +8,7 @@ from ..base import BaseParser, PlatformEnum, ParseException, handle
 from ..data import Platform, MediaContent
 from .decode import decode_init_state
 from .states import Data
+from ...utils import format_num
 
 
 class KuaiShouParser(BaseParser):
@@ -36,7 +37,6 @@ class KuaiShouParser(BaseParser):
 
         # /fw/long-video/ 返回结果不一样, 统一替换为 /fw/photo/ 请求
         real_url = real_url.replace("/fw/long-video/", "/fw/photo/")
-
         async with AsyncClient(
             headers=self.ios_headers, timeout=self.timeout
         ) as client:
@@ -77,5 +77,11 @@ class KuaiShouParser(BaseParser):
             title=photo.caption,
             author=author,
             content=contents,
+            stats=self.create_stats(
+                view_count=format_num(photo.viewCount),
+                like_count=format_num(photo.likeCount),
+                comment_count=format_num(photo.commentCount),
+                share_count=format_num(photo.shareCount),
+            ),
             timestamp=photo.timestamp // 1000,
         )
