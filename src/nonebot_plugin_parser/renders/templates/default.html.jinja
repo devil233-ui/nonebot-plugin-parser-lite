@@ -7,6 +7,7 @@
   <title>Media Card</title>
   {% include "share.html" %}
   {% from "comments.jinja" import render_comments %}
+  {% from "stats.jinja" import render_stats %}
 </head>
 
 <body>
@@ -40,7 +41,10 @@
 
         {# Platform Logo #}
         {% if not is_repost and result.platform and result.platform.logo_path %}
-        <img src="{{ result.platform.logo_path }}" class="platform-logo" alt="{{ result.platform.display_name }}">
+        <div class="tag platform-tag">
+          <img src="{{ result.platform.logo_path }}" style="width: 16px; height: 16px; margin-right: 6px;">
+          <span>{{ result.platform.display_name }}</span>
+        </div>
         {% endif %}
 
         {# QR Code #}
@@ -50,6 +54,8 @@
         {% endif %}
       </div>
       {% endif %}
+      {# --- 统计数据 --- #}
+      {{ render_stats(result.stats) }}
 
       {# Title #} {% if result.title %}
       <div class="title">{{ result.title }}</div>
