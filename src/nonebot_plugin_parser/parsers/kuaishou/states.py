@@ -114,9 +114,9 @@ class SubCommentList(Struct):
 
 
 class CommentList(Struct):
-    subCommentsMap: dict[str, SubCommentList]
+    subCommentsMap: dict[str, SubCommentList] = {}
     """子评论映射map, {父评论id: 子评论列表}"""
-    rootComments: list[Comment]
+    rootComments: list[Comment] = []
     """父评论列表"""
 
 
@@ -135,8 +135,6 @@ class Data(Struct):
     # """系统信息"""
     info: Info = field(name="/rest/wd/ugH5App/photo/simple/info")
     """视频/图集信息"""
-    comments: CommentList | None = field(
-        default=None, name="/rest/wd/photo/comment/list"
-    )
+    comments: CommentList | None = None
     """评论信息，为页面二次加载赋值
     """
