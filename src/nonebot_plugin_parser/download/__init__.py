@@ -206,6 +206,16 @@ class StreamDownloader:
                                             await f.write(chunk)
                                             downloaded_bytes += len(chunk)
                                             bar.advance(task_id, len(chunk))
+
+                                            # 按字节数进行大小限制判断，避免绕过单文件 Content-Length 限制
+                                            file_size_mb = (
+                                                downloaded_bytes / 1024 / 1024
+                                            )
+                                            if file_size_mb > pconfig.max_size:
+                                                logger.warning(
+                                                    f"m3u8 视频大小 {file_size_mb:.2f} MB 超过 {pconfig.max_size} MB，取消下载"
+                                                )
+                                                raise SizeLimitException
                                         break
                                 # 检查 resp.status
                             except Exception as e:
@@ -231,6 +241,10 @@ class StreamDownloader:
 
             logger.success(f"[StreamDownloader] m3u8 视频下载完成: {final_video_path}")
             return final_video_path
+        except SizeLimitException as e:
+            logger.warning(f"[StreamDownloader] m3u8 视频大小超限: {e}")
+            await safe_unlink(temp_ts_path)
+            raise
         except Exception as e:
             logger.error(f"[StreamDownloader] m3u8 视频下载流程出错: {e}")
             await safe_unlink(temp_ts_path)
