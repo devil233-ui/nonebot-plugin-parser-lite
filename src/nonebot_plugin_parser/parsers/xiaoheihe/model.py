@@ -5,7 +5,6 @@ import json
 
 from ..creator import create_image, create_sticker, create_video
 from ..data import MediaContent
-from .sticker_map import EMOJI_MAP
 
 
 class User(Struct):
@@ -128,11 +127,14 @@ def format_sticker(text: str) -> list[MediaContent | str]:
             if plain := text[last_pos:start]:
                 result.append(plain)
 
-        group_name = match["name"]
-        if img_url := EMOJI_MAP.get(group_name):
-            result.append(create_sticker(url=img_url, size="small"))
-        else:
-            result.append(match[0])
+        name = match["name"]
+        size = "medium" if "bigemoji" in name else "small"
+        result.append(
+            create_sticker(
+                url=f"https://emoji.awkchan.top/assets/xiaoheihe/{name}.png",
+                size=size,
+            )
+        )
 
         last_pos = end
 

@@ -146,20 +146,10 @@ class Note(Struct):
     noteDetailMap: dict[str, NoteDetailWrapper]
 
 
-class MojiData(Struct):
-    redmojiMap: dict[str, str]
-    """表情包映射字典"""
-
-
-class RedMoji(Struct):
-    mojiData: MojiData
-
-
 class InitialState(Struct):
     """Root structure of window.__INITIAL_STATE__"""
 
     note: Note
-    redMoji: RedMoji
 
 
 decoder = Decoder(InitialState)

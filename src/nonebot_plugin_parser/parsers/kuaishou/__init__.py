@@ -16,7 +16,6 @@ from .decode import decode_init_state
 from .states import Data, CommentList
 from ...utils import format_num
 from ...browser import BROWSER
-from .sticker_map import EMOJI_MAP
 
 _STICKER_PATTERN = re.compile(r"\[(?P<name>[^]]+)\]")
 
@@ -134,7 +133,7 @@ class KuaiShouParser(BaseParser):
 
     def format_sticker(self, text: str) -> list[MediaContent | str]:
         """
-        将包含小黑盒表情占位符的文本拆分为文本与图片。表情格式形如「[勤洗手]」，先整体按中括号匹配，再解析内部的 group_name 和 code。
+        将包含快手表情占位符的文本拆分为文本与图片。表情格式形如「[勤洗手]」，先整体按中括号匹配，再解析内部的 group_name 和 code。
 
         :param text: 可能包含表情占位符的原始文本，如 "你好[勤洗手]呀"。
         :return: 由普通文本和 MediaContent 组成的列表，顺序与原字符串一致。
@@ -151,11 +150,13 @@ class KuaiShouParser(BaseParser):
                 if plain := text[last_pos:start]:
                     result.append(plain)
 
-            group_name = match["name"]
-            if img_url := EMOJI_MAP.get(group_name):
-                result.append(self.create_sticker(url=img_url, size="small"))
-            else:
-                result.append(match[0])
+            name = match["name"]
+            result.append(
+                self.create_sticker(
+                    url=f"https://emoji.awkchan.top/assets/kuaishou/{name}.png",
+                    size="small",
+                )
+            )
 
             last_pos = end
 

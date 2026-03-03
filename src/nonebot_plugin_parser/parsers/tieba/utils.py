@@ -123,7 +123,7 @@ def build_content(posts: Posts) -> list[MediaContent | str]:
         elif isinstance(part, FragEmoji):
             contents.append(
                 create_sticker(
-                    url=f"https://tb3.bdstatic.com/emoji/{part.id}@2x.png",
+                    url=f"https://emoji.awkchan.top/assets/tieba/{part.id}.png",
                     size="small",
                     desc=part.desc,
                 )
@@ -173,7 +173,7 @@ def build_comment(contents: Contents) -> list[MediaContent | str]:
         elif isinstance(part, FragEmoji):
             content.append(
                 create_sticker(
-                    url=f"https://tb3.bdstatic.com/emoji/{part.id}@2x.png",
+                    url=f"https://emoji.awkchan.top/assets/tieba/{part.id}.png",
                     size="small",
                     desc=part.desc,
                 )
