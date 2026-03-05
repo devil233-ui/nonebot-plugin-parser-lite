@@ -116,6 +116,9 @@ parser_delay_send_lazy_download=False
 # (例如,https://image.baidu.com/search/down?url=)
 # 可以用于不使用魔法下载推特图片(bushi
 parser_pic_proxy=None
+
+# [可选] 浏览器程序路径，如果无法识别浏览器请填写此配置
+parser_browser_path= None
 ```
 
 </details>

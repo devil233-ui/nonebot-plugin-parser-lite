@@ -6,9 +6,8 @@ import contextlib
 import platform
 
 from DrissionPage import Chromium, ChromiumOptions
-
-system = platform.system()
-browser_path = None
+from DrissionPage._units.listener import DataPacket as DataPacket
+from ..config import pconfig
 
 system = platform.system()
 browser_path = None
@@ -39,8 +38,10 @@ elif system == "Darwin":
         if Path(path).is_file():
             browser_path = path
             break
+elif pconfig.browser_path:
+    browser_path = pconfig.browser_path
 if not browser_path:
-    raise RuntimeError("无法找到Edge/Chrome浏览器")
+    raise RuntimeError("无法找到可启动的浏览器")
 
 
 co = ChromiumOptions()

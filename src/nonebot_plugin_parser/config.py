@@ -10,7 +10,6 @@ import nonebot_plugin_localstore as _store
 from nonebot.plugin import PluginMetadata, inherit_supported_adapters
 
 
-# 定义Config类
 class Config(BaseModel):
     parser_bili_ck: str | None = None
     """bilibili cookies"""
@@ -54,6 +53,8 @@ class Config(BaseModel):
     """是否开启懒下载模式，仅在用户请求时才下载视频"""
     parser_pic_proxy: str | None = None
     """图片反向代理地址，用于处理图片下载失败的问题"""
+    parser_browser_path: str | None = None
+    """浏览器程序路径，如果无法识别浏览器请填写此配置"""
 
     @property
     def nickname(self) -> str:
@@ -169,6 +170,11 @@ class Config(BaseModel):
     def pic_proxy(self) -> str | None:
         """图片反向代理地址"""
         return self.parser_pic_proxy
+
+    @property
+    def browser_path(self) -> str | None:
+        """浏览器程序路径"""
+        return self.parser_browser_path
 
 
 # 定义插件元数据
