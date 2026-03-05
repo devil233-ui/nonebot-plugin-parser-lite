@@ -6,7 +6,7 @@ from httpx import AsyncClient
 from ...utils.http_utils import get_async_client
 
 
-from ...utils.common import format_num
+from ...utils.format import format_num
 
 from .model import AtlasData, BlogData, CommentData
 

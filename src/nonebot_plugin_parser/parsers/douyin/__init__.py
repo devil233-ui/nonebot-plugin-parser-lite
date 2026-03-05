@@ -13,7 +13,7 @@ from ..base import (
     handle,
 )
 from .video import decoder
-from ...utils.common import format_num
+from ...utils.format import format_num
 
 
 class DouyinParser(BaseParser):

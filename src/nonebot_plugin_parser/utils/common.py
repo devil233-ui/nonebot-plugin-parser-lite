@@ -187,10 +187,3 @@ def generate_file_name(url: str, default_suffix: str = "") -> str:
     # 获取 url 的 md5 值
     url_hash = hashlib.md5(url.encode()).hexdigest()[:16]
     return f"{url_hash}{suffix}"
-
-
-def format_num(num: int | None) -> str:
-    """将数字格式化为 1.2万 的形式"""
-    if num is None:
-        return "-"
-    return str(num) if num < 10000 else f"{num / 10000:.1f}万"

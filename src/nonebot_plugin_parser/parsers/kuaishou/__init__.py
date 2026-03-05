@@ -14,10 +14,10 @@ from ..base import (
 )
 from .decode import decode_init_state
 from .states import Data, CommentList
-from ...utils.common import format_num
+from ...utils.format import format_num, replace_placeholder_to_sticker
 from ...utils.browser import BROWSER, DataPacket
 
-_STICKER_PATTERN = re.compile(r"\[(?P<name>[^]]+)\]")
+KUAISHOU_PATTERN = re.compile(r"\[(?P<name>[^]]+)\]")
 
 
 class KuaiShouParser(BaseParser):
@@ -105,7 +105,9 @@ class KuaiShouParser(BaseParser):
                     name=rc.author_name,
                     avatar_url=rc.headurl,
                 ),
-                content=self.format_sticker(rc.content),
+                content=replace_placeholder_to_sticker(
+                    rc.content, KUAISHOU_PATTERN, "kuaishou"
+                ),
                 timestamp=rc.timestamp // 1000,
                 stats=self.create_stats(
                     like_count=format_num(rc.likedCount),
@@ -120,7 +122,9 @@ class KuaiShouParser(BaseParser):
                             name=sc.author_name,
                             avatar_url=sc.headurl,
                         ),
-                        content=self.format_sticker(sc.content),
+                        content=replace_placeholder_to_sticker(
+                            sc.content, KUAISHOU_PATTERN, "kuaishou"
+                        ),
                         timestamp=sc.timestamp // 1000,
                         stats=self.create_stats(
                             like_count=format_num(sc.likedCount),
@@ -128,40 +132,4 @@ class KuaiShouParser(BaseParser):
                     )
                 )
             result.append(rootComment)
-        return result
-
-    def format_sticker(self, text: str) -> list[MediaContent | str]:
-        """
-        将包含快手表情占位符的文本拆分为文本与图片。表情格式形如「[勤洗手]」，先整体按中括号匹配，再解析内部的 group_name 和 code。
-
-        :param text: 可能包含表情占位符的原始文本，如 "你好[勤洗手]呀"。
-        :return: 由普通文本和 MediaContent 组成的列表，顺序与原字符串一致。
-        """
-        if "[" not in text or "]" not in text or not _STICKER_PATTERN.search(text):
-            return [text]
-
-        result: list[MediaContent | str] = []
-        last_pos = 0
-
-        for match in _STICKER_PATTERN.finditer(text):
-            start, end = match.span()
-            if start > last_pos:
-                if plain := text[last_pos:start]:
-                    result.append(plain)
-
-            name = match["name"]
-            result.append(
-                self.create_sticker(
-                    url=f"https://emoji.awkchan.top/assets/kuaishou/{name}.png",
-                    size="small",
-                )
-            )
-
-            last_pos = end
-
-        # 最后剩余的纯文本
-        if last_pos < len(text):
-            if tail := text[last_pos:]:
-                result.append(tail)
-
         return result

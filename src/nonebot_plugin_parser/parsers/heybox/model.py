@@ -1,10 +1,19 @@
 import json
 import re
+from typing import Literal
 
 from msgspec import Struct, field
 
 from ..creator import create_image, create_sticker, create_video
 from ..data import MediaContent
+from ...utils.format import replace_placeholder_to_sticker
+
+
+HEYBOX_PATTERN = re.compile(r"\[(?P<name>[^]]+)\]")
+
+
+def size_resolver(name: str) -> Literal["small", "medium"]:
+    return "medium" if "bigemoji" in name else "small"
 
 
 class User(Struct):
@@ -36,7 +45,9 @@ class CommentItem(Struct):
 
     @property
     def content(self) -> list[MediaContent | str]:
-        content = format_sticker(self.text)
+        content = replace_placeholder_to_sticker(
+            self.text, HEYBOX_PATTERN, "heybox", size_resolver
+        )
         for img in self.imgs:
             content.append(create_image(url=img.url + "\\"))
         if self.is_cy:
@@ -88,7 +99,11 @@ class Link(Struct):
             parts = json.loads(self.text)
             for part in parts:
                 if part["type"] == "text":
-                    content.extend(format_sticker(part["text"]))
+                    content.extend(
+                        replace_placeholder_to_sticker(
+                            self.text, HEYBOX_PATTERN, "heybox", size_resolver
+                        )
+                    )
                 elif part["type"] == "img":
                     content.append(create_image(url=part["url"] + "\\"))
         except (json.JSONDecodeError, TypeError):
@@ -103,44 +118,3 @@ class Link(Struct):
 class BaseResult(Struct):
     comments: list[CommentData]
     link: Link
-
-
-_STICKER_PATTERN = re.compile(r"\[(?P<name>[^]]+)\]")
-
-
-def format_sticker(text: str) -> list[MediaContent | str]:
-    """
-    将包含小黑盒表情占位符的文本拆分为文本与图片。表情格式形如「[cube_开心]」，先整体按中括号匹配，再解析内部的 group_name 和 code。
-
-    :param text: 可能包含表情占位符的原始文本，如 "你好[cube_开心]呀"。
-    :return: 由普通文本和 MediaContent 组成的列表，顺序与原字符串一致。
-    """
-    if "[" not in text or "]" not in text or not _STICKER_PATTERN.search(text):
-        return [text]
-
-    result: list[MediaContent | str] = []
-    last_pos = 0
-
-    for match in _STICKER_PATTERN.finditer(text):
-        start, end = match.span()
-        if start > last_pos:
-            if plain := text[last_pos:start]:
-                result.append(plain)
-
-        name = match["name"]
-        size = "medium" if "bigemoji" in name else "small"
-        result.append(
-            create_sticker(
-                url=f"https://emoji.awkchan.top/assets/heybox/{name}.png",
-                size=size,
-            )
-        )
-
-        last_pos = end
-
-    # 最后剩余的纯文本
-    if last_pos < len(text):
-        if tail := text[last_pos:]:
-            result.append(tail)
-
-    return result

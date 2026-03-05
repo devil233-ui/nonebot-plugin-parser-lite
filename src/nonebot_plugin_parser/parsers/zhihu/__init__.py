@@ -2,7 +2,7 @@ import re
 from typing import ClassVar
 
 
-from ...utils.common import format_num
+from ...utils.format import format_num
 
 from .answer import decoder as answerDecoder
 from ..base import (

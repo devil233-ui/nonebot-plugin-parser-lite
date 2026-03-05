@@ -3,6 +3,7 @@ from typing import ClassVar
 from urllib.parse import parse_qsl
 
 from ...utils.http_utils import get_async_client
+from ...utils.format import replace_placeholder_to_sticker
 
 from ..base import (
     Platform,
@@ -17,11 +18,12 @@ from ..base import (
 from msgspec import convert
 from .explore import (
     CommentList,
+    NoteDetailWrapper,
     decoder as exploreDecoder,
 )
 from nonebot.log import logger
 
-_STICKER_PATTERN = re.compile(r"\[(?P<name>[^]]+[a-zA-Z])\]")
+REDNOTE_PATTERN = re.compile(r"\[(?P<name>[^]]+[a-zA-Z])\]")
 
 
 class RedNoteParser(BaseParser):
@@ -88,56 +90,94 @@ class RedNoteParser(BaseParser):
         return await self.parse_explore(full_url, note_id, xsec_token)
 
     async def parse_explore(self, url: str, note_id: str, xsec_token: str):
+        """解析小红书笔记详情页"""
         async with get_async_client() as client:
-            response = await client.get(url)
-            response.raise_for_status()
-            html = response.text
-            pattern = r"window\.__INITIAL_STATE__=(.*?)</script>"
-            if matched := re.search(pattern, html):
-                raw = matched[1].replace("undefined", '""')
-            else:
-                raise ParseException("小红书分享链接失效或内容已删除")
-            response = await client.get(
-                "https://edith.xiaohongshu.com/api/sns/web/v2/comment/page",
-                params={
-                    "note_id": note_id,
-                    "cursor": "",
-                    "top_comment_id": "",
-                    "image_formats": "jpg,webp,avif",
-                    "xsec_token": xsec_token,
-                },
-            )
-            data = response.json()
-            if data["code"] != 0:
-                logger.warning("获取小红书评论数据失败")
-                logger.error(response.text)
-                com_data = {"comments": []}
-            else:
-                com_data = data["data"]
+            raw = await self._fetch_init_state(client, url)
+            com_data = await self._fetch_comments(client, note_id, xsec_token)
 
         init_state = exploreDecoder.decode(raw)
         note_data = init_state.note.noteDetailMap[note_id]
         note_data.comments_list = convert(com_data, CommentList)
 
+        return self._build_result(note_data)
+
+    async def _fetch_init_state(self, client, url: str) -> str:
+        """获取并提取页面中的 __INITIAL_STATE__ 原始 JSON 字符串"""
+        response = await client.get(url)
+        response.raise_for_status()
+        html = response.text
+
+        pattern = r"window\.__INITIAL_STATE__=(.*?)</script>"
+        if matched := re.search(pattern, html):
+            # 将 undefined 替换为空字符串，避免 JSON 解析失败
+            return matched[1].replace("undefined", '""')
+
+        raise ParseException("小红书分享链接失效或内容已删除")
+
+    async def _fetch_comments(self, client, note_id: str, xsec_token: str) -> dict:
+        """获取笔记评论原始数据字典形式"""
+        response = await client.get(
+            "https://edith.xiaohongshu.com/api/sns/web/v2/comment/page",
+            params={
+                "note_id": note_id,
+                "cursor": "",
+                "top_comment_id": "",
+                "image_formats": "jpg,webp,avif",
+                "xsec_token": xsec_token,
+            },
+        )
+        data = response.json()
+        if data.get("code") != 0:
+            logger.warning("获取小红书评论数据失败")
+            logger.error(response.text)
+            return {"comments": []}
+
+        return data.get("data", {"comments": []})
+
+    def _build_result(self, note_data: NoteDetailWrapper):
+        """从 note_data 构建最终解析结果"""
         note_detail = note_data.note
+
         contents: list[MediaContent | str] = [note_detail.desc]
         image_urls = note_detail.image_urls
 
+        # 视频 / 图片内容
         if video_url := note_detail.video_url:
             cover_url = image_urls[0] if image_urls else None
             contents.append(self.create_video(video_url, cover_url))
         elif image_urls:
             contents.extend(self.create_images(image_urls))
 
+        # 直播回放等附加视频
         contents.extend(
             self.create_video(live_url, live_cover_url)
             for live_url, live_cover_url in note_detail.live_urls
         )
+
         author = self.create_author(
-            name=note_detail.nickname, avatar_url=note_detail.avatar_url
+            name=note_detail.nickname,
+            avatar_url=note_detail.avatar_url,
         )
 
-        commentList: list[Comment] = []
+        comment_list = self._build_comments(note_data)
+
+        return self.result(
+            title=note_detail.title,
+            author=author,
+            stats=self.create_stats(
+                like_count=note_detail.interactInfo.likedCount,
+                comment_count=note_detail.interactInfo.commentCount,
+                share_count=note_detail.interactInfo.shareCount,
+                collect_count=note_detail.interactInfo.collectedCount,
+            ),
+            comments=comment_list,
+            content=contents,
+            timestamp=note_detail.lastUpdateTime // 1000,
+        )
+
+    def _build_comments(self, note_data) -> list[Comment]:
+        """从 note_data.comments_list 构建标准 Comment 列表"""
+        comment_list: list[Comment] = []
 
         for c in note_data.comments_list.comments:
             comment = self.create_comment(
@@ -145,7 +185,9 @@ class RedNoteParser(BaseParser):
                     name=c.userInfo.nickname,
                     avatar_url=c.userInfo.image,
                 ),
-                content=self.format_sticker(c.content),
+                content=replace_placeholder_to_sticker(
+                    c.content, REDNOTE_PATTERN, "rednote"
+                ),
                 timestamp=c.createTime,
                 stats=self.create_stats(
                     like_count=c.likeCount,
@@ -161,61 +203,16 @@ class RedNoteParser(BaseParser):
                             name=sub.userInfo.nickname,
                             avatar_url=sub.userInfo.image,
                         ),
-                        content=self.format_sticker(sub.content),
+                        content=replace_placeholder_to_sticker(
+                            sub.content, REDNOTE_PATTERN, "rednote"
+                        ),
                         timestamp=sub.createTime,
                         stats=self.create_stats(
                             like_count=sub.likeCount,
                         ),
                     )
                 )
-            commentList.append(comment)
 
-        return self.result(
-            title=note_detail.title,
-            author=author,
-            stats=self.create_stats(
-                like_count=note_detail.interactInfo.likedCount,
-                comment_count=note_detail.interactInfo.commentCount,
-                share_count=note_detail.interactInfo.shareCount,
-                collect_count=note_detail.interactInfo.collectedCount,
-            ),
-            comments=commentList,
-            content=contents,
-            timestamp=note_detail.lastUpdateTime // 1000,
-        )
+            comment_list.append(comment)
 
-    def format_sticker(self, text: str) -> list[MediaContent | str]:
-        """
-        将包含表情占位符的文本拆分为文本与图片
-
-        :param text: 可能包含表情占位符的原始文本，如 "你好[勤洗手]呀"。
-        :return: 由普通文本和 MediaContent 组成的列表，顺序与原字符串一致。
-        """
-        if "[" not in text or "]" not in text or not _STICKER_PATTERN.search(text):
-            return [text]
-
-        result: list[MediaContent | str] = []
-        last_pos = 0
-
-        for match in _STICKER_PATTERN.finditer(text):
-            start, end = match.span()
-            if start > last_pos:
-                if plain := text[last_pos:start]:
-                    result.append(plain)
-
-            name = match["name"]
-            result.append(
-                self.create_sticker(
-                    url=f"https://emoji.awkchan.top/assets/rednote/{name}.png",
-                    size="small",
-                )
-            )
-
-            last_pos = end
-
-        # 最后剩余的纯文本
-        if last_pos < len(text):
-            if tail := text[last_pos:]:
-                result.append(tail)
-
-        return result
+        return comment_list

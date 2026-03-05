@@ -23,7 +23,7 @@ from httpx import AsyncClient
 from msgspec import convert
 from nonebot import logger
 
-from ...utils.common import format_num
+from ...utils.format import format_num
 from ...utils.http_utils import get_async_client
 from ..base import (
     DOWNLOADER,

@@ -5,7 +5,7 @@ from typing import ClassVar
 
 from msgspec import convert
 
-from ...utils.common import format_num
+from ...utils.format import format_num
 
 
 from .model import TweetResult
