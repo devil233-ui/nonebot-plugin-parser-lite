@@ -87,8 +87,6 @@ class Comment(Struct):
     content: str
     timestamp: int
     likedCount: int
-    authorArea: str
-    """归属地"""
     comment_id: int
     """评论id"""
     headurl: str
@@ -97,6 +95,8 @@ class Comment(Struct):
     author_name: str
     subCommentCount: int = 0
     """子评论数量"""
+    authorArea: str = ""
+    """归属地"""
 
 
 class SubCommentList(Struct):
