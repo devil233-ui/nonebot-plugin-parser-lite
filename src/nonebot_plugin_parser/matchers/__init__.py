@@ -239,6 +239,7 @@ if pconfig.lazy_download:
             await UniHelper.message_reaction(event, "resolving")
             async for message in RENDERER.send_content(result):
                 await message.send()
+            await UniHelper.message_reaction(event, "done")
             LazyManager.remove(session.user.id)
         except Exception:
             await UniHelper.message_reaction(event, "fail")
