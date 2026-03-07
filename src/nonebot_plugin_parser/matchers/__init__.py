@@ -236,16 +236,10 @@ if pconfig.lazy_download:
             result = LazyManager.get(session.user.id)
             if not result:
                 return
-            if not result.content:
-                await UniHelper.message_reaction(event, "fail")
-                return
             await UniHelper.message_reaction(event, "resolving")
-
-            # 发送延迟的媒体内容
             async for message in RENDERER.send_content(result):
                 await message.send()
-
+            LazyManager.remove(session.user.id)
         except Exception:
             await UniHelper.message_reaction(event, "fail")
-        finally:
             LazyManager.remove(session.user.id)
