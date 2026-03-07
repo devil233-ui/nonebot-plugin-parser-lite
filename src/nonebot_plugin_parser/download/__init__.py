@@ -67,25 +67,48 @@ class StreamDownloader:
                     "GET", url, headers=headers, follow_redirects=True
                 ) as response:
                     response.raise_for_status()
-                    content_length = response.headers.get("Content-Length")
-                    content_length = int(content_length) if content_length else 0
+                    content_length_header = response.headers.get("Content-Length")
 
-                    if content_length == 0:
-                        logger.warning(f"媒体 url: {url}, 大小为 0, 取消下载")
-                        raise ZeroSizeException
+                    # 解析 Content-Length，允许为 None（分块传输）
+                    content_length = (
+                        int(content_length_header) if content_length_header else None
+                    )
 
-                    if (file_size := content_length / 1024 / 1024) > pconfig.max_size:
-                        logger.warning(
-                            f"媒体 url: {url} 大小 {file_size:.2f} MB 超过 {pconfig.max_size} MB, 取消下载"
-                        )
-                        raise SizeLimitException
+                    # 有 Content-Length 时，先做一次快速预判
+                    if content_length is not None:
+                        if content_length == 0:
+                            logger.warning(f"媒体 url: {url}, 大小为 0, 取消下载")
+                            raise ZeroSizeException
 
-                    with self.get_progress_bar(file_name, content_length) as bar:
+                        file_size_mb = content_length / 1024 / 1024
+                        if file_size_mb > pconfig.max_size:
+                            logger.warning(
+                                f"媒体 url: {url} 大小 {file_size_mb:.2f} MB 超过 {pconfig.max_size} MB, 取消下载"
+                            )
+                            raise SizeLimitException
+
+                    with self.get_progress_bar(file_name, content_length or 0) as bar:
                         task_id = bar.task_ids[0]
+                        downloaded_bytes = 0
+
                         async with aiofiles.open(file_path, "wb") as file:
                             async for chunk in response.aiter_bytes(1024 * 1024):
+                                if not chunk:
+                                    continue
                                 await file.write(chunk)
-                                bar.advance(task_id, len(chunk))
+                                chunk_len = len(chunk)
+                                downloaded_bytes += chunk_len
+                                # 进度条在 content_length 为空时只显示已下载大小
+                                bar.advance(task_id, chunk_len)
+
+                                # 当服务端不提供 Content-Length 时，按实际已下载大小限流
+                                if content_length is None:
+                                    file_size_mb = downloaded_bytes / 1024 / 1024
+                                    if file_size_mb > pconfig.max_size:
+                                        logger.warning(
+                                            f"媒体 url: {url} 实际下载大小 {file_size_mb:.2f} MB 超过 {pconfig.max_size} MB, 取消下载"
+                                        )
+                                        raise SizeLimitException
                     # 下载成功，跳出循环
                     break
             except (HTTPError, ConnectionError, TimeoutError, OSError) as e:
