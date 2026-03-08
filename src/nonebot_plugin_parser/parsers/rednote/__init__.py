@@ -8,8 +8,16 @@ from nonebot.log import logger
 
 from ...utils.format import replace_placeholder_to_sticker
 from ...utils.http_utils import get_async_client
-from ..base import (BaseParser, Comment, MediaContent, ParseException,
-                    Platform, PlatformEnum, handle, pconfig)
+from ..base import (
+    BaseParser,
+    Comment,
+    MediaContent,
+    ParseException,
+    Platform,
+    PlatformEnum,
+    handle,
+    pconfig,
+)
 from .explore import CommentList, NoteDetailWrapper
 from .explore import decoder as exploreDecoder
 

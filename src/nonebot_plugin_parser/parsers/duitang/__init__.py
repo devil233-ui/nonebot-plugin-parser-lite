@@ -2,16 +2,12 @@ from re import Match
 from typing import ClassVar
 
 from httpx import AsyncClient
-
-from ...utils.http_utils import get_async_client
-
+from msgspec import convert
 
 from ...utils.format import format_num
-
+from ...utils.http_utils import get_async_client
+from ..base import BaseParser, Comment, MediaContent, Platform, PlatformEnum, handle
 from .model import AtlasData, BlogData, CommentData
-
-from ..base import BaseParser, PlatformEnum, Platform, handle, MediaContent, Comment
-from msgspec import convert
 
 
 class DuiTangParser(BaseParser):
