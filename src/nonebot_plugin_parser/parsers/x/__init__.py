@@ -74,10 +74,9 @@ class XParser(BaseParser):
         if res["code"] != 100000:
             raise ParseException(res["message"])
 
-        data = res["data"]["data"]["threaded_conversation_with_injections_v2"]
-        instructions = data["instructions"]
-        # 目前接口返回结构依赖 instructions[1]，保留下标但提取中间变量以便后续维护
-        tweet_raw = instructions[1]["entries"][0]["content"]["itemContent"]["tweet_results"]
+        tweet_raw = res["data"]["data"]["threaded_conversation_with_injections_v2"][
+            "instructions"
+        ][1]["entries"][0]["content"]["itemContent"]["tweet_results"]
 
         tweet = convert(tweet_raw, TweetResult)
         return self.collect_data(tweet)

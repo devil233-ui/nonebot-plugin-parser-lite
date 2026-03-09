@@ -53,7 +53,7 @@ class UserLegacy(Struct):
     followers_count: int
     """粉丝数"""
     profile_image_url_https: str
-    
+
     @property
     def avatar_url(self):
         return self.profile_image_url_https.replace("_normal", "_bigger")
