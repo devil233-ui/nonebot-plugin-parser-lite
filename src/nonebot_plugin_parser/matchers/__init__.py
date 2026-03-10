@@ -149,6 +149,25 @@ def clear_result_cache():
     _RESULT_CACHE.clear()
 
 
+async def _send_parse_result(session: Uninfo, result: ParseResult) -> None:
+    """根据配置发送解析结果："""
+    summary_msg = await RENDERER.render_messages(result)
+    await summary_msg.send()
+    lazy_mode = pconfig.lazy_download
+    is_all_text = all(isinstance(c, str) for c in result.content)
+    if is_all_text:
+        return
+    if lazy_mode:
+        download_cmd = ", ".join(pconfig.download_command)
+        await UniMessage(
+            f"请在{LazyManager.TIMEOUT_SECONDS}秒内发送以下命令之一来获取媒体资源: \n{download_cmd}"
+        ).send()
+        LazyManager.add(session.user.id, result)
+        return
+    async for content_msg in RENDERER.send_content(result):
+        await content_msg.send()
+
+
 @UniHelper.with_reaction
 async def parser_handler(
     session: Uninfo,
@@ -169,18 +188,7 @@ async def parser_handler(
 
     # 2. 渲染并发送
     try:
-        message = await RENDERER.render_messages(result)
-        await message.send()
-        if pconfig.lazy_download:
-            # 懒下载模式：只发送渲染结果 + 下载提示，由 lazy_matcher 负责后续内容发送
-            download_cmd = ", ".join(pconfig.download_command)
-            await UniMessage(
-                f"请在{LazyManager.TIMEOUT_SECONDS}秒内发送以下命令之一来获取媒体资源: \n{download_cmd}"
-            ).send()
-            LazyManager.add(session.user.id, result)
-        else:
-            async for content_msg in RENDERER.send_content(result):
-                await content_msg.send()
+        await _send_parse_result(session, result)
     except Exception as e:
         # 渲染或发送失败时的兜底日志
         logger.error("渲染或发送失败: %s", e, exc_info=True)
