@@ -60,6 +60,8 @@ class DynamicMajor(Struct):
         """获取标题"""
         if self.type == "MAJOR_TYPE_ARCHIVE" and self.archive:
             return self.archive.title
+        elif self.type == "MAJOR_TYPE_OPUS" and self.opus:
+            return self.opus.title
         return None
 
     @property
