@@ -145,10 +145,10 @@ async def build_html(
                 '<div class="images-grid single">'
                 '<div class="image-item">'
                 f'<img src="{src}">'
-                "</div>"
-                "</div>"
                 '<div class="play-btn-overlay">'
                 '<i class="fas fa-play" style="margin-left: 4px;"></i>'
+                "</div>"
+                "</div>"
                 "</div>"
                 "</div>"
             )
