@@ -116,7 +116,7 @@ def _resolve_browser_path() -> str:
 
 
 browser_path = _resolve_browser_path()
-logger.debug(f"Launching browser from {browser_path}")
+logger.info(f"Launching browser from {browser_path}")
 co = ChromiumOptions()
 co.mute(True)
 co.incognito(True)
