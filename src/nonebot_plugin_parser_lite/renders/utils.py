@@ -144,7 +144,7 @@ async def build_html(
                 '<div class="images-container">'
                 '<div class="images-grid single">'
                 '<div class="image-item">'
-                f'<img src="{src}">'
+                f'<img src="{src}" style="max-height: 400px;">'
                 '<div class="play-btn-overlay">'
                 '<i class="fas fa-play" style="margin-left: 4px;"></i>'
                 "</div>"
