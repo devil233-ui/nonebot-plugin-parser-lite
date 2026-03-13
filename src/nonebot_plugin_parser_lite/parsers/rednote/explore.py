@@ -118,24 +118,29 @@ class NoteDetail(Struct):
 
         - Live Photo -> LivePhotoContent
         - 普通图片   -> ImageContent
-        - 主视频     -> VideoContent
+        - 主视频     -> VideoContent (如果有视频，则第一张图是封面)
         """
         items: list[MediaContent] = []
 
-        for img in self.imageList:
-            if img.livePhoto:
-                items.append(
-                    create_live_photo(
-                        video_url=img.stream.url,
-                        image_url=img.urlDefault,
-                    )
-                )
-            else:
-                items.append(create_image(url=img.urlDefault))
-        # 主视频：有就追加一个
+        # 处理视频情况：如果有视频，第一张图片是封面
         if self.video:
-            if v_url := self.video.url:
-                items.append(create_video(url_or_task=v_url))
+            items.append(
+                create_video(
+                    url_or_task=self.video.url, cover_url=self.imageList[0].urlDefault
+                )
+            )
+        else:
+            # 处理图片情况：没有视频时，正常处理图片列表
+            for img in self.imageList:
+                if img.livePhoto:
+                    items.append(
+                        create_live_photo(
+                            video_url=img.stream.url,
+                            image_url=img.urlDefault,
+                        )
+                    )
+                else:
+                    items.append(create_image(url=img.urlDefault))
 
         return items
 
