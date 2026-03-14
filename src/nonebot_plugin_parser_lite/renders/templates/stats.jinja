@@ -2,12 +2,12 @@
 {% macro render_stats(stats) %}
 {% set stat_items = [] %}
 
-{# 按照顺序：播放 弹幕 硬币 点赞 收藏 评论 分享 #}
+{# 按照顺序：查看 弹幕 硬币 点赞 收藏 评论 分享 #}
 {# 只添加有值的统计项，没有值时不显示整个div盒子 #}
 
-{# 播放量 #}
+{# 查看 #}
 {% if stats.view_count and stats.view_count != '-' %}
-{% set _ = stat_items.append({'key': 'play', 'value': stats.view_count, 'label': '播放', 'icon': 'fa-eye',
+{% set _ = stat_items.append({'key': 'view', 'value': stats.view_count, 'label': '查看', 'icon': 'fa-eye',
 'color':
 '#e74c3c'}) %}
 {% endif %}

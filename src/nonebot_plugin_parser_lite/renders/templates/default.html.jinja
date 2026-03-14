@@ -12,7 +12,7 @@
 
 <body>
   {% macro render_card(result, is_repost=False) %}
-  <div class="card">
+  <div class="card" {% if is_repost %}style="width: 100%; margin-bottom: 0;" {% endif %}>
     {% if not is_repost %}
     <div class="decorative-stripe"></div>
     {% endif %}

@@ -352,17 +352,43 @@
     display: grid;
     gap: 6px;
     width: 100%;
-    border-radius: 8px;
     overflow: hidden;
+  }
+
+  .images-grid img {
+    border-radius: 8px;
   }
 
   .images-grid.single {
     grid-template-columns: 1fr;
   }
 
-  /* 单图：只限制最大高度 */
+  /* 单图：竖屏图限制宽度为135px，高度自动缩放 */
   .images-grid.single .image-item {
     max-height: 650px;
+  }
+
+  .images-grid.single .video-cover {
+    max-height: 1440px;
+    position: relative;
+    overflow: hidden;
+    background: #eee;
+  }
+
+  .video-cover img {
+    max-width: 100%;
+  }
+
+  /* 竖屏图 */
+  .images-grid.single .image-item.aspect-ratio-portrait {
+    max-width: 135px;
+    height: auto;
+  }
+
+  /* 横屏图 */
+  .images-grid.single .image-item.aspect-ratio-landscape {
+    max-height: 650px;
+    width: auto;
   }
 
   .images-grid.double {
@@ -558,4 +584,38 @@
     color: var(--gray-color);
     margin-top: 2px;
   }
+
+  .live-photo {
+    bottom: 8px;
+    position: absolute;
+    right: 8px;
+    -webkit-box-align: center;
+    -ms-flex-align: center;
+    align-items: center;
+    background-color: rgba(0, 0, 0, .5);
+    border: none;
+    border-radius: 2px;
+    color: #fff;
+    cursor: pointer;
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    height: 19px;
+    outline: none;
+    padding: 0 4px;
+  }
 </style>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.images-grid.single .image-item').forEach(item => {
+      const img = item.querySelector('img');
+      if (img) {
+        if (img.height > img.width) {
+          item.classList.add('aspect-ratio-portrait');
+        } else {
+          item.classList.add('aspect-ratio-landscape');
+        }
+      }
+    });
+  });
+</script>
