@@ -3,8 +3,8 @@ import json
 from msgspec import Struct
 from enum import IntEnum
 from bs4 import BeautifulSoup
-from ...parsers.data import MediaContent
-from ...parsers.creator import create_image
+from ..data import MediaContent
+from ..creator import create_image
 
 
 class PostType(IntEnum):

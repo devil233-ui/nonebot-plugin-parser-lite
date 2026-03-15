@@ -1,7 +1,7 @@
 from msgspec import Struct, field
 
-from ...parsers.data import MediaContent
-from ...parsers.creator import create_sticker
+from ..data import MediaContent
+from ..creator import create_sticker
 from bs4 import BeautifulSoup
 
 
