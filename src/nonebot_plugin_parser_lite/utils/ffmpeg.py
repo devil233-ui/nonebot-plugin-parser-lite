@@ -208,10 +208,10 @@ class FFmpeg:
         # 这样可以避免手动算尺寸导致 concat 报尺寸不一致。
         filter_v = (
             "[1:v][0:v]scale2ref=flags=bicubic[v_still_raw][v_main];"
-            "[v_main]setsar=1[v_main_sar];"
             "[v_still_raw]setsar=1,"
             "fade=t=in:st=0:d=0.2[v_still];"
-            "[v_main_sar][v_still]concat=n=2:v=1:a=0[outv]"
+            "[v_main]setsar=1[v_main_sar];"
+            "[v_still][v_main_sar]concat=n=2:v=1:a=0[outv]"
         )
 
         if bgm_path and bgm_path.exists():
