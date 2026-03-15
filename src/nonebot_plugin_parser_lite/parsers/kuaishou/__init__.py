@@ -82,7 +82,6 @@ class KuaiShouParser(BaseParser):
         comments = self.format_comments(data_map.comments)
 
         return self.result(
-            title=photo.caption,
             author=author,
             content=contents,
             stats=self.create_stats(
