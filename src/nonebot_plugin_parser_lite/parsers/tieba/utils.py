@@ -85,7 +85,7 @@ async def pack_req(data: bytes) -> bytes:
                 "Content-Type": f"multipart/form-data; boundary={boundary}",
             },
             params={"cmd": 302001},
-            content=body,
+            data=body,
         )
         return response.content
 
@@ -129,7 +129,12 @@ def build_content(posts: Posts) -> list[MediaContent | str]:
                 )
             )
         elif isinstance(part, FragImage):
-            contents.append(create_graphic(part.origin_src))
+            contents.append(
+                create_graphic(
+                    image_url=part.origin_src,
+                    extra_headers={"Referer": "https://tieba.baidu.com/"},
+                )
+            )
         elif isinstance(part, FragAt):
             # 如果上一项是文本，则追加到上一项末尾
             if contents and isinstance(contents[-1], str):
@@ -148,6 +153,7 @@ def build_content(posts: Posts) -> list[MediaContent | str]:
                     url_or_task=part.src,
                     cover_url=part.cover_src,
                     duration=part.duration,
+                    extra_headers={"Referer": "https://tieba.baidu.com/"},
                 )
             )
         # 经过测试，所有帖子中的语音均无法播放，无法进行地址捕获

@@ -6,8 +6,9 @@ from typing import ClassVar
 from bs4 import Tag, BeautifulSoup
 
 from ...utils.http_utils import get_async_client
-
-from . import common, article
+from math import ceil
+from .article import decoder as articleDecoder
+from .common import WeiboData, decoder as commonDecoder
 from ..base import (
     Platform,
     BaseParser,
@@ -16,6 +17,7 @@ from ..base import (
     handle,
     MediaContent,
 )
+from .show import decoder as showDecoder
 
 
 class WeiBoParser(BaseParser):
@@ -89,7 +91,7 @@ class WeiBoParser(BaseParser):
             response = await client.get(url, params=params)
             response.raise_for_status()
 
-        detail = article.decoder.decode(response.content)
+        detail = articleDecoder.decode(response.content)
 
         if detail.msg != "success":
             raise ParseException("请求失败")
@@ -127,7 +129,6 @@ class WeiBoParser(BaseParser):
 
     async def parse_fid(self, fid: str):
         """解析 show (带 fid)"""
-        from . import show
 
         req_url = f"https://h5.video.weibo.com/api/component?page=/show/{fid}"
         headers = {
@@ -135,13 +136,14 @@ class WeiBoParser(BaseParser):
             "Content-Type": "application/x-www-form-urlencoded",
             **self.headers,
         }
-        post_content = 'data={"Component_Play_Playinfo":{"oid":"' + fid + '"}}'
 
         async with get_async_client(headers=headers) as client:
-            response = await client.post(req_url, data=post_content)
+            response = await client.post(
+                req_url, data={"data": f'{{Component_Play_Playinfo": {{"oid": {fid}}}'}
+            )
             response.raise_for_status()
 
-        data = show.decoder.decode(response.content).data
+        data = showDecoder.decode(response.content).data
         play_info = data.Component_Play_Playinfo
         author = self.create_author(
             name=play_info.name,
@@ -199,21 +201,32 @@ class WeiBoParser(BaseParser):
                     f"获取数据失败 content-type is not application/json (got: {ctype})"
                 )
 
-        weibo_data = common.decoder.decode(response.content).data
+        weibo_data = commonDecoder.decode(response.content).data
 
         return self._collect_result(weibo_data)
 
-    def _collect_result(self, data: common.WeiboData):
+    def _collect_result(self, data: WeiboData):
         contents: list[MediaContent | str] = [data.text_content]
 
         # 添加视频内容
         if video_url := data.video_url:
             cover_url = data.cover_url
-            contents.append(self.create_video(video_url, cover_url))
+            contents.append(
+                self.create_video(
+                    url_or_task=video_url,
+                    cover_url=cover_url,
+                    extra_headers={"Referer": "https://weibo.com/"},
+                )
+            )
 
         # 添加图片内容
         if image_urls := data.image_urls:
-            contents.extend(self.create_images(image_urls))
+            contents.extend(
+                self.create_images(
+                    image_urls=image_urls,
+                    extra_headers={"Referer": "https://weibo.com/"},
+                )
+            )
 
         # 构建作者
         author = self.create_author(
@@ -247,7 +260,6 @@ class WeiBoParser(BaseParser):
 
     def _mid2id(self, mid: str) -> str:
         """将微博 mid 转换为 id"""
-        from math import ceil
 
         mid = mid[::-1]
         size = ceil(len(mid) / 7)  # 计算每个块的大小

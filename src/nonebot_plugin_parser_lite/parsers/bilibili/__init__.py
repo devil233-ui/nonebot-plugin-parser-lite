@@ -219,9 +219,10 @@ class BilibiliParser(BaseParser):
 
         # 创建视频下载内容（传递下载函数而非立即执行）
         video_content = self.create_video(
-            download_video,
-            page_info.cover,
-            page_info.duration,
+            url_or_task=download_video,
+            cover_url=page_info.cover,
+            duration=page_info.duration,
+            extra_headers={"Referer": url},
         )
 
         # 提取统计数据
