@@ -68,7 +68,7 @@ class Video(Struct):
 
 
 class Image(Struct):
-    urlDefault: str
+    url: str
     livePhoto: bool = False
     """是否为 iPhone Live Photo"""
     stream: Stream = field(default_factory=Stream)
@@ -76,14 +76,15 @@ class Image(Struct):
 
 
 class CommentImage(Struct):
-    url_default: str
+    originUrl: str
 
 
 class User(Struct):
     """用户信息"""
 
-    nickname: str
+    nickName: str
     avatar: str
+    userId: str
 
 
 class InteractInfo(Struct):
@@ -113,7 +114,7 @@ class NoteDetail(Struct):
     @property
     def nickname(self) -> str:
         """作者昵称"""
-        return self.user.nickname
+        return self.user.nickName
 
     @property
     def avatar_url(self) -> str:
@@ -136,7 +137,7 @@ class NoteDetail(Struct):
             items.append(
                 create_video(
                     url_or_task=self.video.url,
-                    cover_url=self.imageList[0].urlDefault,
+                    cover_url=self.imageList[0].url,
                 )
             )
         else:
@@ -146,13 +147,13 @@ class NoteDetail(Struct):
                     items.append(
                         create_live_photo(
                             video_url=img.stream.url,
-                            image_url=img.urlDefault,
+                            image_url=img.url,
                         )
                     )
                 else:
                     items.append(
                         create_image(
-                            url=img.urlDefault,
+                            url=img.url,
                         )
                     )
 
@@ -162,25 +163,24 @@ class NoteDetail(Struct):
 class CommentUser(Struct):
     nickname: str
     image: str
-    user_id: str
+    userId: str
 
 
 class Comment(Struct):
-    user_info: CommentUser
-    create_time: int
-    like_count: str
+    user: CommentUser
+    time: int
+    likeCount: int
     text: str = field(name="content")
-    ip_location: str = ""
+    ipLocation: str = ""
     pictures: list[CommentImage] = field(default_factory=list)
-    sub_comments: list["Comment"] = field(default_factory=list)
+    subComments: list["Comment"] = field(default_factory=list)
 
     @property
     def content(self) -> list[MediaContent | str]:
         content = replace_placeholder_to_sticker(self.text, REDNOTE_PATTERN, "rednote")
         content.extend(
             create_image(
-                url=pic.url_default,
-                extra_headers={"Referer": "https:///www.xiaohongshu.com"},
+                url=pic.originUrl,
             )
             for pic in self.pictures
         )
@@ -194,20 +194,20 @@ class CommentList(Struct):
 class NoteDetailWrapper(Struct):
     """Wrapper for note detail, represents the value in noteDetailMap[xhs_id]"""
 
-    note: NoteDetail
-    comments_list: CommentList = field(default_factory=CommentList)
+    noteData: NoteDetail
+    commentData: CommentList = field(default_factory=CommentList)
 
 
 class Note(Struct):
     """Top-level note container with noteDetailMap"""
 
-    noteDetailMap: dict[str, NoteDetailWrapper]
+    data: NoteDetailWrapper
 
 
 class InitialState(Struct):
     """Root structure of window.__INITIAL_STATE__"""
 
-    note: Note
+    noteData: Note
 
 
 decoder = Decoder(InitialState)

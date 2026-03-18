@@ -2,9 +2,7 @@ import re
 from typing import ClassVar
 from urllib.parse import parse_qsl
 
-# from msgspec import convert
-# from nonebot.log import logger
-# from xhshow import SessionManager, Xhshow
+from ...utils.format import format_num
 
 from ...utils.http_utils import AsyncSession, get_async_client
 from ..base import (
@@ -17,11 +15,7 @@ from ..base import (
     handle,
     pconfig,
 )
-from .explore import NoteDetailWrapper
-from .explore import decoder as exploreDecoder
-
-# CLIENT = Xhshow()
-# SESSION = SessionManager()
+from .discovery import NoteDetailWrapper, decoder as exploreDecoder
 
 
 INITIAL_STATE = re.compile(
@@ -60,7 +54,7 @@ class RedNoteParser(BaseParser):
         url = f"https://{searched[0]}"
         return await self.parse_with_redirect(url, self.ios_headers)
 
-    # https://www.xiaohongshu.com/discovery/item/691e68a8000000001e02bcda?xsec_token=CBunzr4Cq8N7jbcXqpWDxGn11k7XwVIJ59KOvkRS_Qabw=
+    # https://www.xiaohongshu.com/discovery/item/691e68a8000000001e02bcda?xsec_token=CBwYRkYkdf7BHsEy2bVC9-ZYDHXJDjIRl6QI8xzqm-gEg
     @handle(
         "xiaohongshu.com",
         r"(?P<type>explore|search_result|discovery/item)/(?P<note_id>[0-9a-zA-Z]+)\?(?P<qs>[A-Za-z0-9._%&+=/#@-]+)",
@@ -72,7 +66,7 @@ class RedNoteParser(BaseParser):
         qs = searched["qs"]
 
         # 原始 URL（保留所有 query 参数）
-        full_url = f"{xhs_domain}/explore/{note_id}"
+        full_url = f"{xhs_domain}/discovery/item/{note_id}"
 
         # 解析 query string，检查 xsec_token
         params_dict = dict(parse_qsl(qs, keep_blank_values=True))
@@ -87,18 +81,14 @@ class RedNoteParser(BaseParser):
 
     async def parse_explore(self, url: str, note_id: str, xsec_token: str):
         """解析小红书笔记详情页"""
-        async with get_async_client(headers=self.headers) as client:
+        async with get_async_client(headers=self.ios_headers) as client:
             raw = await self._fetch_init_state(client, url)
-            # com_data = await self._fetch_comments(client, note_id, xsec_token)
 
         init_state = exploreDecoder.decode(raw)
-        note_data = init_state.note.noteDetailMap[note_id]
-        # note_data.comments_list = convert(com_data, CommentList)
+        note_data = init_state.noteData.data
 
         result = self._build_result(note_data)
-        result.url = (
-            f"https://www.xiaohongshu.com/explore/{note_id}?xsec_token={xsec_token}"
-        )
+        result.url = f"https://www.xiaohongshu.com/discovery/item/{note_id}?xsec_token={xsec_token}"
         return result
 
     async def _fetch_init_state(self, client: AsyncSession, url: str) -> str:
@@ -113,46 +103,9 @@ class RedNoteParser(BaseParser):
 
         raise ParseException("小红书分享链接失效或内容已删除")
 
-    # async def _fetch_comments(
-    #     self, client: AsyncSession, note_id: str, xsec_token: str
-    # ) -> dict:
-    #     """获取笔记评论原始数据字典形式"""
-    #     self.comment_headers.update(
-    #         CLIENT.sign_headers_get(
-    #             "https://edith.xiaohongshu.com/api/sns/web/v2/comment/page",
-    #             cookies=pconfig.xhs_ck or "",
-    #             params={
-    #                 "note_id": note_id,
-    #                 "cursor": "",
-    #                 "top_comment_id": "",
-    #                 "image_formats": "jpg,webp,avif",
-    #                 "xsec_token": xsec_token,
-    #             },
-    #             session=SESSION,
-    #         )
-    #     )
-    #     response = await client.get(
-    #         "https://edith.xiaohongshu.com/api/sns/web/v2/comment/page",
-    #         params={
-    #             "note_id": note_id,
-    #             "cursor": "",
-    #             "top_comment_id": "",
-    #             "image_formats": "jpg,webp,avif",
-    #             "xsec_token": xsec_token,
-    #         },
-    #         headers=self.comment_headers,
-    #     )
-    #     data = response.json()
-    #     if data.get("code") != 0:
-    #         logger.warning("获取小红书评论数据失败")
-    #         logger.error(response.text)
-    #         return {"comments": []}
-
-    #     return data.get("data", {"comments": []})
-
     def _build_result(self, note_data: NoteDetailWrapper):
         """从 note_data 构建最终解析结果"""
-        note_detail = note_data.note
+        note_detail = note_data.noteData
 
         contents: list[MediaContent | str] = [note_detail.desc]
         contents.extend(note_detail.medias)
@@ -182,32 +135,32 @@ class RedNoteParser(BaseParser):
         """从 note_data.comments_list 构建标准 Comment 列表"""
         comment_list: list[Comment] = []
 
-        for c in note_data.comments_list.comments:
+        for c in note_data.commentData.comments:
             comment = self.create_comment(
                 author=self.create_author(
-                    name=c.user_info.nickname,
-                    avatar_url=c.user_info.image,
+                    name=c.user.nickname,
+                    avatar_url=c.user.image,
                 ),
                 content=c.content,
-                timestamp=c.create_time // 1000,
+                timestamp=c.time // 1000,
                 stats=self.create_stats(
-                    like_count=c.like_count,
-                    comment_count=str(len(c.sub_comments)),
+                    like_count=format_num(c.likeCount),
+                    comment_count=str(len(c.subComments)),
                 ),
-                location=c.ip_location,
+                location=c.ipLocation,
             )
 
-            for sub in c.sub_comments:
+            for sub in c.subComments:
                 comment.replies.append(
                     self.create_comment(
                         author=self.create_author(
-                            name=sub.user_info.nickname,
-                            avatar_url=sub.user_info.image,
+                            name=sub.user.nickname,
+                            avatar_url=sub.user.image,
                         ),
                         content=sub.content,
-                        timestamp=sub.create_time // 1000,
+                        timestamp=sub.time // 1000,
                         stats=self.create_stats(
-                            like_count=sub.like_count,
+                            like_count=format_num(sub.likeCount),
                         ),
                     )
                 )
