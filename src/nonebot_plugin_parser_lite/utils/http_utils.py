@@ -38,4 +38,4 @@ def get_async_client(**kwargs) -> AsyncSession:
     """
     timeout = kwargs.pop("timeout", 15)
 
-    return AsyncSession(timeout=timeout, **kwargs, impersonate="chrome131")
+    return AsyncSession(timeout=timeout, **kwargs, impersonate="edge")
