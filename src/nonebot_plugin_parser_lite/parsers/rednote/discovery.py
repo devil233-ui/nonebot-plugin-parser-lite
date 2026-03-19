@@ -68,11 +68,16 @@ class Video(Struct):
 
 
 class Image(Struct):
-    url: str
+    fileId: str
     livePhoto: bool = False
     """是否为 iPhone Live Photo"""
     stream: Stream = field(default_factory=Stream)
     """iPhone Live Photo 视频流"""
+
+    @property
+    def url(self) -> str:
+        """图片无水印直链"""
+        return f"http://ci.xiaohongshu.com/{self.fileId}?imageView2/2/w/1080/format/jpg"
 
 
 class CommentImage(Struct):
