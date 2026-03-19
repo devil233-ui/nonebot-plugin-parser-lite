@@ -114,7 +114,9 @@ class Renderer:
             try:
                 async for msg in self._handle_immediate_media(cont):
                     yield msg
-            except (SizeLimitException, ZeroSizeException):
+            except SizeLimitException:
+                yield UniMessage("媒体大小超过限制，取消下载")
+            except ZeroSizeException:
                 continue
             except DownloadException:
                 failed_count += 1
