@@ -116,6 +116,7 @@ class Renderer:
                     yield msg
             except SizeLimitException:
                 yield UniMessage("媒体大小超过限制，取消下载")
+                continue
             except ZeroSizeException:
                 continue
             except DownloadException:
