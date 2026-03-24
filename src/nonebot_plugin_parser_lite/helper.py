@@ -35,12 +35,8 @@ class UniHelper:
     ) -> Reference:
         """构造转发消息
 
-        Args:
-            user_id (str): 用户ID
-            segments (Sequence[ForwardNode]): 消息段
-
-        Returns:
-            Reference: 转发消息
+        :param segments: 转发消息节点列表
+        :param user_id: 用户ID
         """
         if user_id is None:
             user_id = current_bot.get().self_id
@@ -59,63 +55,55 @@ class UniHelper:
 
     @staticmethod
     def img_seg(
-        img_path: Path | None = None,
-        raw: bytes | None = None,
+        file: Path | bytes,
     ) -> Image:
         """获取图片 Seg
 
-        Args:
-            img_path (Path): 图片路径
-
-        Returns:
-            Image: 图片 Seg
+        :param file: 图片资源
         """
 
-        if raw is not None:
-            return Image(raw=raw)
+        if isinstance(file, (bytes, bytearray, memoryview)):
+            return Image(raw=file)
 
-        if img_path is None:
-            raise ValueError("img_path 和 raw 不能都为 None")
-
-        if pconfig.use_base64:
-            return Image(raw=img_path.read_bytes())
-        else:
-            return Image(path=img_path)
+        return Image(raw=file.read_bytes()) if pconfig.use_base64 else Image(path=file)
 
     @staticmethod
-    def record_seg(audio_path: Path) -> Voice:
+    def record_seg(file: Path) -> Voice:
         """获取语音 Seg
 
-        Args:
-            audio_path (Path): 语音路径
-
-        Returns:
-            Voice: 语音 Seg
+        :param file: 语音文件
         """
-        if pconfig.use_base64:
-            return Voice(raw=audio_path.read_bytes())
-        else:
-            return Voice(path=audio_path)
+        return Voice(raw=file.read_bytes()) if pconfig.use_base64 else Voice(path=file)
 
     @classmethod
-    def video_seg(cls, video_path: Path) -> Video | File | Text:
+    def video_seg(
+        cls,
+        file: Path,
+        thumbnail: Path | None = None,
+    ) -> Video | File | Text:
         """获取视频 Seg
 
-        Returns:
-            Video | File | Text: 视频 Seg
+        :param file: 视频路径
+        :param thumbnail: 缩略图路径
         """
         # 检测文件大小
-        file_size_byte_count = int(video_path.stat().st_size)
+        file_size_byte_count = int(file.stat().st_size)
         if file_size_byte_count == 0:
             return Text("视频文件大小为 0")
         elif file_size_byte_count > 100 * 1024 * 1024:
             # 转为文件 Seg
-            return cls.file_seg(video_path, display_name=video_path.name)
+            return cls.file_seg(file, display_name=file.name)
         else:
             if pconfig.use_base64:
-                return Video(raw=video_path.read_bytes())
+                video = Video(raw=file.read_bytes())
+                if thumbnail and thumbnail.stat().st_size > 0:
+                    video.thumbnail = cls.img_seg(thumbnail.read_bytes())
             else:
-                return Video(path=video_path)
+                video = Video(path=file)
+                if thumbnail and thumbnail.stat().st_size > 0:
+                    video.thumbnail = cls.img_seg(thumbnail)
+
+            return video
 
     @staticmethod
     def file_seg(
@@ -124,12 +112,8 @@ class UniHelper:
     ) -> File:
         """获取文件 Seg
 
-        Args:
-            file (Path): 文件路径
-            display_name (str): 显示名称. Defaults to file.name.
-
-        Returns:
-            File: 文件 Seg
+        :param file: 文件路径
+        :param display_name: 显示名称
         """
         if not display_name:
             display_name = file.name
@@ -154,9 +138,8 @@ class UniHelper:
     ) -> None:
         """发送消息回应
 
-        Args:
-            event (Event): 事件对象
-            status (Literal["fail", "resolving", "done"]): 状态
+        :param event: 事件对象
+        :param status: 状态
         """
         message_id = uniseg.get_message_id(event)
         target = uniseg.get_target(event)
@@ -179,11 +162,7 @@ class UniHelper:
 
         自动处理消息响应状态，并捕获 TipException 发送提示消息
 
-        Args:
-            func: 被装饰的函数
-
-        Returns:
-            装饰后的函数
+        :param func: 被装饰的函数
         """
 
         @wraps(func)

@@ -220,7 +220,7 @@ async def _(bv: Match[str]):
 async def _():
     parser = get_parser_by_type(BilibiliParser)
     qrcode = await parser.login_with_qrcode()
-    await UniMessage(UniHelper.img_seg(raw=qrcode)).send()
+    await UniMessage(UniHelper.img_seg(qrcode)).send()
     async for msg in parser.check_qr_state():
         await UniMessage(msg).send()
 
