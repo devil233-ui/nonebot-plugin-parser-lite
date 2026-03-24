@@ -327,7 +327,6 @@ class Renderer:
     async def _resolve_parse_result(self, result: ParseResult) -> dict[str, Any]:
         """解析 ParseResult 为模板可用的字典数据"""
 
-        logo_path = Path(__file__).parent / "resources" / f"{result.platform.name}.png"
         avatar_path = await result.author.get_avatar_path()
         # 这些是一定会有的字段
         data: dict[str, Any] = {
@@ -338,7 +337,7 @@ class Renderer:
             "platform": {
                 "display_name": result.platform.display_name,
                 "name": result.platform.name,
-                "logo_path": (logo_path.as_uri() if logo_path.exists() else None),
+                "logo_path": f"https://emoji.awkchan.top/assets/logo/{result.platform.name}.png",
             },
             "content": result.content,
             "cover_path": await result.get_cover_path(),

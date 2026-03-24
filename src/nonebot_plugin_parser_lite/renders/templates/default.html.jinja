@@ -32,7 +32,7 @@
         </div>
 
         {# Platform Logo #}
-        {% if not is_repost and result.platform and result.platform.logo_path %}
+        {% if not is_repost %}
         <div class="tag platform-tag">
           <img src="{{ result.platform.logo_path }}" style="height: 16px; margin-right: 6px;">
           <span>{{ result.platform.display_name }}</span>
