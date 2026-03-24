@@ -106,6 +106,10 @@ plite_max_size=90
 # 可选值: ["bilibili", "douyin", "kuaishou", "x", "acfun", "weibo", "rednote"]
 plite_disabled_platforms=["x"]
 
+# [可选] 黑名单用户列表
+# 示例 plite_blacklist=["QQClient_123456"]
+plite_blacklist_users=[]
+
 # [可选] 是否在解析结果中附加原始URL
 plite_append_url=False
 

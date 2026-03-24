@@ -39,15 +39,19 @@ def get_group_key(session: Uninfo) -> str:
 
 # Rule
 def is_enabled(session: Uninfo) -> bool:
-    """判断当前会话是否在关闭解析的名单中"""
+    if f"{session.scope}_{session.user.id}" in pconfig.blacklist_users:
+        # 黑名单用户，直接禁用
+        return False
     if session.scene.is_private:
         return True
-
+    # 群聊：看这个群 key 是否在关闭列表里
     group_key = get_group_key(session)
     return group_key not in _DISABLED_GROUPS_SET
 
 
-@on_command("开启解析", rule=to_me(), permission=SUPERUSER | ADMIN(), block=True).handle()
+@on_command(
+    "开启解析", rule=to_me(), permission=SUPERUSER | ADMIN(), block=True
+).handle()
 async def _(matcher: Matcher, session: Uninfo):
     """开启解析"""
     group_key = get_group_key(session)
@@ -59,7 +63,9 @@ async def _(matcher: Matcher, session: Uninfo):
         await matcher.finish("解析已开启，无需重复开启")
 
 
-@on_command("关闭解析", rule=to_me(), permission=SUPERUSER | ADMIN(), block=True).handle()
+@on_command(
+    "关闭解析", rule=to_me(), permission=SUPERUSER | ADMIN(), block=True
+).handle()
 async def _(matcher: Matcher, session: Uninfo):
     """关闭解析"""
     group_key = get_group_key(session)
