@@ -1,22 +1,23 @@
+from math import ceil
 from re import Match
 from time import time
-from uuid import uuid4
 from typing import ClassVar
+from uuid import uuid4
 
-from bs4 import Tag, BeautifulSoup
-
+from bs4 import BeautifulSoup, Tag
 from httpx import AsyncClient
-from math import ceil
-from .article import decoder as articleDecoder
-from .common import WeiboData, decoder as commonDecoder
+
 from ..base import (
-    Platform,
     BaseParser,
-    PlatformEnum,
-    ParseException,
-    handle,
     MediaContent,
+    ParseException,
+    Platform,
+    PlatformEnum,
+    handle,
 )
+from .article import decoder as articleDecoder
+from .common import WeiboData
+from .common import decoder as commonDecoder
 from .show import decoder as showDecoder
 
 
@@ -28,15 +29,16 @@ class WeiBoParser(BaseParser):
 
     def __init__(self):
         super().__init__()
-        extra_headers = {
-            "accept": (
-                "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,"
-                "image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"
-            ),
-            "referer": "https://weibo.com/",
-            "origin": "https://weibo.com",
-        }
-        self.headers.update(extra_headers)
+        self.headers.update(
+            {
+                "accept": (
+                    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,"
+                    "image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"
+                ),
+                "referer": "https://weibo.com/",
+                "origin": "https://weibo.com",
+            }
+        )
 
     # https://weibo.com/tv/show/1034:5007449447661594?mid=5007452630158934
     @handle("weibo.com/tv", r"weibo\.com/tv/show/\d{4}:\d+\?mid=(?P<mid>\d+)")
@@ -215,7 +217,7 @@ class WeiBoParser(BaseParser):
                 self.create_video(
                     url_or_task=video_url,
                     cover_url=cover_url,
-                    extra_headers={"Referer": "https://weibo.com/"},
+                    ext_headers={"Referer": "https://weibo.com/"},
                 )
             )
 
@@ -224,7 +226,7 @@ class WeiBoParser(BaseParser):
             contents.extend(
                 self.create_images(
                     image_urls=image_urls,
-                    extra_headers={"Referer": "https://weibo.com/"},
+                    ext_headers={"Referer": "https://weibo.com/"},
                 )
             )
 

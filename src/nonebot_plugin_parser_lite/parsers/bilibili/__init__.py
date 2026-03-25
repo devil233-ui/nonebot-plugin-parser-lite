@@ -19,6 +19,7 @@ from bilibili_api.video import (
     VideoDownloadURLDataDetecter,
     VideoStreamDownloadURL,
 )
+from httpx import AsyncClient
 from msgspec import convert
 from nonebot import logger
 
@@ -39,7 +40,6 @@ from ..base import (
     pconfig,
 )
 from ..cookie import ck2dict
-from httpx import AsyncClient
 from .dynamic import DynamicData, DynamicInfo
 from .favlist import FavData
 from .live import RoomData
@@ -222,7 +222,7 @@ class BilibiliParser(BaseParser):
             url_or_task=download_video,
             cover_url=page_info.cover,
             duration=page_info.duration,
-            extra_headers={"Referer": url},
+            ext_headers={"Referer": url},
         )
 
         # 提取统计数据

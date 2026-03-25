@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import Any, Literal, Sequence
 
 from ..config import pconfig as pconfig
-from ..constants import COMMON_HEADER
 from ..download import DOWNLOADER
 from ..download.task import DownloadTaskWrapper
 from .data import (
@@ -18,8 +17,6 @@ from .data import (
     StickerContent,
     VideoContent,
 )
-
-headers = COMMON_HEADER.copy()
 
 
 def _with_need_send(obj: MediaContent, need_send: bool) -> MediaContent:
@@ -42,9 +39,7 @@ def create_author(
     :param id: 作者 ID
     """
 
-    avatar_task = None
-    if avatar_url:
-        avatar_task = DOWNLOADER.download_img(avatar_url, ext_headers=headers)
+    avatar_task = DOWNLOADER.download_img(avatar_url) if avatar_url else None
     return Author(name=name, id=id, avatar=avatar_task, description=description)
 
 
@@ -56,7 +51,7 @@ def create_video(
     duration: float = 0.0,
     video_name: str | None = None,
     need_send: bool = True,
-    extra_headers: dict[str, str] | None = None,
+    ext_headers: dict[str, str] | None = None,
 ):
     """
     创建视频内容
@@ -66,17 +61,15 @@ def create_video(
     :param duration: 视频时长
     :param video_name: 视频名称
     :param need_send: 是否发送
-    :param extra_headers: 额外请求头
+    :param ext_headers: 额外请求头
     """
-    headers.update(extra_headers or {})
-
     cover_task = None
     if cover_url:
-        cover_task = DOWNLOADER.download_img(url=cover_url, ext_headers=headers)
+        cover_task = DOWNLOADER.download_img(url=cover_url, ext_headers=ext_headers)
     # 1) 传入 URL: 使用默认下载逻辑
     if isinstance(url_or_task, str):
         video_task = DOWNLOADER.download_video(
-            url_or_task, video_name=video_name, ext_headers=headers
+            url_or_task, video_name=video_name, ext_headers=ext_headers
         )
     # 2) 传入 DownloadTaskWrapper: 保持原样
     elif isinstance(url_or_task, DownloadTaskWrapper):
@@ -102,17 +95,17 @@ def create_video(
 
 def create_videos(
     video_urls: list[str],
-    extra_headers: dict[str, str] | None = None,
+    ext_headers: dict[str, str] | None = None,
 ):
     """
     创建视频内容列表
 
     :param video_urls: 视频 URL 列表
-    :param extra_headers: 额外请求头
+    :param ext_headers: 额外请求头
     """
 
     return [
-        create_video(url_or_task=url, extra_headers=extra_headers) for url in video_urls
+        create_video(url_or_task=url, ext_headers=ext_headers) for url in video_urls
     ]
 
 
@@ -120,7 +113,7 @@ def create_image(
     url: str,
     img_name: str | None = None,
     need_send: bool = True,
-    extra_headers: dict[str, str] | None = None,
+    ext_headers: dict[str, str] | None = None,
 ):
     """
     创建图片内容
@@ -128,27 +121,26 @@ def create_image(
     :param url: 图片 URL
     :param img_name: 图片名称
     :param need_send: 是否发送
-    :param extra_headers: 额外请求头
+    :param ext_headers: 额外请求头
     """
-    headers.update(extra_headers or {})
 
-    task = DOWNLOADER.download_img(url, img_name=img_name, ext_headers=headers)
+    task = DOWNLOADER.download_img(url, img_name=img_name, ext_headers=ext_headers)
 
     return _with_need_send(ImageContent(path_task=task), need_send)
 
 
 def create_images(
     image_urls: list[str],
-    extra_headers: dict[str, str] | None = None,
+    ext_headers: dict[str, str] | None = None,
 ):
     """
     创建图片内容列表
 
     :param image_urls: 图片 URL 列表
-    :param extra_headers: 额外请求头
+    :param ext_headers: 额外请求头
     """
 
-    return [create_image(url=url, extra_headers=extra_headers) for url in image_urls]
+    return [create_image(url=url, ext_headers=ext_headers) for url in image_urls]
 
 
 def create_audio(
@@ -156,7 +148,7 @@ def create_audio(
     duration: float = 0.0,
     audio_name: str | None = None,
     need_send: bool = True,
-    extra_headers: dict[str, str] | None = None,
+    ext_headers: dict[str, str] | None = None,
 ):
     """
     创建音频内容
@@ -165,11 +157,12 @@ def create_audio(
     :param duration: 音频时长
     :param audio_name: 音频名称
     :param need_send: 是否发送
-    :param extra_headers: 额外请求头
+    :param ext_headers: 额外请求头
     """
-    headers.update(extra_headers or {})
 
-    task = DOWNLOADER.download_audio(url, audio_name=audio_name, ext_headers=headers)
+    task = DOWNLOADER.download_audio(
+        url, audio_name=audio_name, ext_headers=ext_headers
+    )
 
     return _with_need_send(AudioContent(path_task=task, duration=duration), need_send)
 
@@ -179,7 +172,7 @@ def create_graphic(
     img_name: str | None = None,
     alt: str | None = None,
     need_send: bool = True,
-    extra_headers: dict[str, str] | None = None,
+    ext_headers: dict[str, str] | None = None,
 ):
     """
     图片,此图片不参与九宫格
@@ -188,12 +181,11 @@ def create_graphic(
     :param img_name: 图片名称
     :param alt: 图片描述
     :param need_send: 是否发送
-    :param extra_headers: 额外请求头
+    :param ext_headers: 额外请求头
     """
-    headers.update(extra_headers or {})
 
     image_task = DOWNLOADER.download_img(
-        image_url, img_name=img_name, ext_headers=headers
+        image_url, img_name=img_name, ext_headers=ext_headers
     )
     return _with_need_send(GraphicContent(path_task=image_task, alt=alt), need_send)
 
@@ -202,7 +194,7 @@ def create_sticker(
     url: str,
     size: Literal["small", "medium"] = "medium",
     desc: str | None = None,
-    extra_headers: dict[str, str] | None = None,
+    ext_headers: dict[str, str] | None = None,
 ):
     """
     创建贴纸内容
@@ -212,11 +204,10 @@ def create_sticker(
         - small: 比文字大一点
         - medium: 文字大小的两倍大一点
     :param desc: 贴纸描述
-    :param extra_headers: 额外请求头
+    :param ext_headers: 额外请求头
     """
-    headers.update(extra_headers or {})
 
-    image_task = DOWNLOADER.download_img(url, ext_headers=headers)
+    image_task = DOWNLOADER.download_img(url, ext_headers=ext_headers)
     return StickerContent(path_task=image_task, size=size, desc=desc)
 
 
@@ -225,7 +216,7 @@ def create_live_photo(
     image_url: str,
     bgm_url: str | None = None,
     need_send: bool = True,
-    extra_headers: dict[str, str] | None = None,
+    ext_headers: dict[str, str] | None = None,
 ):
     """
     创建  iPhone Live Photo 内容
@@ -234,14 +225,13 @@ def create_live_photo(
     :param image_url: iPhone Live Photo 底图
     :param bgm_url: iPhone Live Photo 背景音乐
     :param need_send: 是否发送
-    :param extra_headers: 额外请求头
+    :param ext_headers: 额外请求头
     """
-    headers.update(extra_headers or {})
 
-    video_task = DOWNLOADER.download_video(video_url, ext_headers=headers)
-    image_task = DOWNLOADER.download_img(image_url, ext_headers=headers)
+    video_task = DOWNLOADER.download_video(video_url, ext_headers=ext_headers)
+    image_task = DOWNLOADER.download_img(image_url, ext_headers=ext_headers)
     if bgm_url:
-        bgm_task = DOWNLOADER.download_audio(bgm_url, ext_headers=headers)
+        bgm_task = DOWNLOADER.download_audio(bgm_url, ext_headers=ext_headers)
     else:
         bgm_task = None
     return _with_need_send(

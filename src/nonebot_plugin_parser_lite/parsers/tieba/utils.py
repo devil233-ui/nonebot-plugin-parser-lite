@@ -2,28 +2,29 @@
 
 from pathlib import Path
 
-from httpx import AsyncClient
 from google.protobuf import descriptor_pb2, descriptor_pool
 from google.protobuf.message_factory import GetMessageClass
-from ..data import MediaContent, Comment
-from .models import (
-    Post,
-    Posts,
-    FragAt,
-    Contents,
-    FragLink,
-    FragText,
-    FragEmoji,
-    FragImage,
-    FragVideo,
-)
+from httpx import AsyncClient
+
 from ..creator import (
+    create_author,
+    create_comment,
     create_graphic,
     create_stats,
-    create_video,
     create_sticker,
-    create_comment,
-    create_author,
+    create_video,
+)
+from ..data import Comment, MediaContent
+from .models import (
+    Contents,
+    FragAt,
+    FragEmoji,
+    FragImage,
+    FragLink,
+    FragText,
+    FragVideo,
+    Post,
+    Posts,
 )
 
 
@@ -132,7 +133,7 @@ def build_content(posts: Posts) -> list[MediaContent | str]:
             contents.append(
                 create_graphic(
                     image_url=part.origin_src,
-                    extra_headers={"Referer": "https://tieba.baidu.com/"},
+                    ext_headers={"Referer": "https://tieba.baidu.com/"},
                 )
             )
         elif isinstance(part, FragAt):
@@ -153,7 +154,7 @@ def build_content(posts: Posts) -> list[MediaContent | str]:
                     url_or_task=part.src,
                     cover_url=part.cover_src,
                     duration=part.duration,
-                    extra_headers={"Referer": "https://tieba.baidu.com/"},
+                    ext_headers={"Referer": "https://tieba.baidu.com/"},
                 )
             )
         # 经过测试，所有帖子中的语音均无法播放，无法进行地址捕获

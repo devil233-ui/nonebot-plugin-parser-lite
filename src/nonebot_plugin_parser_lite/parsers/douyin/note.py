@@ -1,11 +1,10 @@
 import re
 
 from msgspec import Struct, field
+
 from ...utils.format import replace_placeholder_to_sticker
-
-from ..data import MediaContent
 from ..creator import create_audio, create_image, create_live_photo
-
+from ..data import MediaContent
 
 DOUYIN_PATTERN = re.compile(r"\[(?P<name>[^]]+)\]")
 
@@ -77,14 +76,14 @@ class Aweme(Struct):
                     create_live_photo(
                         video_url=image.video.playAddr[0].src,
                         image_url=image.video.cover,
-                        extra_headers={"Referer": "https://www.douyin.com/"},
+                        ext_headers={"Referer": "https://www.douyin.com/"},
                     )
                 )
             else:
                 content.append(
                     create_image(
                         url=image.urlList[0],
-                        extra_headers={"Referer": "https://www.douyin.com/"},
+                        ext_headers={"Referer": "https://www.douyin.com/"},
                     )
                 )
         if music := self.music.playUrl.uri:
@@ -124,7 +123,7 @@ class Comment(Struct):
         content.extend(
             create_image(
                 url=image.originUrl.urlList[0],
-                extra_headers={"Referer": "https://www.douyin.com/"},
+                ext_headers={"Referer": "https://www.douyin.com/"},
             )
             for image in self.imageList
         )

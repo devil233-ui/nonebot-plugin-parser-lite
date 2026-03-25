@@ -4,10 +4,9 @@ from typing import Any
 from msgspec import Struct, field
 from msgspec.json import Decoder
 
-from ..data import MediaContent
-from ..creator import create_image, create_video
-
 from ..base import ParseException
+from ..creator import create_image, create_video
+from ..data import MediaContent
 
 
 class Avatar(Struct):
@@ -74,7 +73,7 @@ class VideoData(Struct):
             medias.extend(
                 create_image(
                     url=image.url_list[0].replace("playwm", "play"),
-                    extra_headers={"Referer": "https://www.douyin.com/"},
+                    ext_headers={"Referer": "https://www.douyin.com/"},
                 )
                 for image in self.images
             )
@@ -87,7 +86,7 @@ class VideoData(Struct):
                     cover_url=self.video.cover.url_list[0],
                     duration=self.video.duration,
                     video_name=f"{self.aweme_id}.mp4",
-                    extra_headers={"Referer": "https://www.douyin.com/"},
+                    ext_headers={"Referer": "https://www.douyin.com/"},
                 )
             )
         return medias
