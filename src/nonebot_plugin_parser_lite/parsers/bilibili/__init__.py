@@ -207,7 +207,7 @@ class BilibiliParser(BaseParser):
                 return await DOWNLOADER.download_av_and_merge(
                     v_url,
                     a_url,
-                    file_name=f"{video_info.bvid}-{page_num}.mp4",
+                    file_name=f"{video_info.bvid}-{page_num}",
                     ext_headers=self.headers,
                 )
             else:

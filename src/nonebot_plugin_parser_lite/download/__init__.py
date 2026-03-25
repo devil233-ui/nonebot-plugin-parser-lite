@@ -506,7 +506,7 @@ class StreamDownloader:
 
         :param v_url: 视频流下载地址
         :param a_url: 音频流下载地址
-        :param file_name: 合并后输出文件名
+        :param file_name: 合并后输出文件名(不含扩展名)
         :param ext_headers: 额外的请求头，会与默认请求头合并
         :return: 合并后的视频文件本地路径
         :raises DownloadException: 下载或合并过程中发生错误时抛出
