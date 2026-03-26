@@ -285,8 +285,10 @@ class Renderer:
 
         # # 创建一个包加载器对象
         # env = Environment(
-        #     loader=FileSystemLoader(self.templates_dir), enable_async=True
+        #     loader=FileSystemLoader(self.templates_dir),
+        #     enable_async=True,
         # )
+        # env.filters["safe_path"] = safe_path
         # template = env.get_template(template_name)
         # # 渲染
         # with open(
@@ -298,7 +300,6 @@ class Renderer:
         #         await template.render_async(
         #             **{
         #                 "result": template_data,
-        #                 "max_comments": pconfig.max_comments,
         #                 "rendering_time": datetime.datetime.now().strftime(
         #                     "%Y-%m-%d %H:%M:%S"
         #                 ),
@@ -313,7 +314,6 @@ class Renderer:
             screenshot_timeout=60000,
             templates={
                 "result": template_data,
-                "max_comments": pconfig.max_comments,
                 "rendering_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "bot_name": _nickname,
             },
