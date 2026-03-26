@@ -41,6 +41,7 @@ def replace_placeholder_to_sticker(
             create_sticker(
                 url=f"https://emoji.awkchan.top/assets/{platform}/{name}.png",
                 size=size,
+                desc=name,
             )
         )
 
