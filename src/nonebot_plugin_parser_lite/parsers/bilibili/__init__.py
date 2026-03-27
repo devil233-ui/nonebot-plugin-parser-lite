@@ -840,15 +840,6 @@ class BilibiliParser(BaseParser):
 
         self._cookies_file.write_text(json.dumps(self._credential.get_cookies()))
 
-    def _load_credential(self):
-        """从文件加载哔哩哔哩登录凭证"""
-        if not self._cookies_file.exists():
-            return
-
-        self._credential = Credential.from_cookies(
-            json.loads(self._cookies_file.read_text())
-        )
-
     async def login_with_qrcode(self) -> bytes:
         """通过二维码登录获取哔哩哔哩登录凭证"""
         self._qr_login = QrCodeLogin()
@@ -880,10 +871,25 @@ class BilibiliParser(BaseParser):
         else:
             yield "二维码登录超时, 请重新生成"
 
-    async def _init_credential(self):
-        """初始化哔哩哔哩登录凭证"""
-        if pconfig.bili_ck is None:
-            self._load_credential()
+    async def _init_credential(self) -> None:
+        """初始化哔哩哔哩登录凭证.
+
+        优先顺序:
+        1. 本地 cookies 文件
+        2. 配置中的 bili_ck
+        """
+        if self._cookies_file.exists():
+            try:
+                cookies_raw = self._cookies_file.read_text()
+                cookies = json.loads(cookies_raw)
+                self._credential = Credential.from_cookies(cookies)
+                return
+            except Exception as e:
+                logger.warning(
+                    f"[BiliParser] 读取本地 cookies 失败，将尝试使用配置 ck: {e!r}"
+                )
+
+        if not pconfig.bili_ck:
             return
 
         credential = Credential.from_cookies(ck2dict(pconfig.bili_ck))
@@ -892,8 +898,7 @@ class BilibiliParser(BaseParser):
             self._credential = credential
             self._save_credential()
         else:
-            logger.info(f"`parser_bili_ck` 已过期, 尝试从 {self._cookies_file} 加载")
-            self._load_credential()
+            logger.warning("`parser_bili_ck` 已过期, 请更新 ck")
 
     async def _fetch_comments(self, oid: int, type: int) -> list[Comment]:
         """从 Bilibili API 获取评论数据，优先热评，失败时兜底普通评论"""
