@@ -18,8 +18,11 @@ class XParser(BaseParser):
         user = tweet.user
 
         repost: ParseResult | None = None
-        if not is_repost and tweet.quoted_tweet:
-            repost = self.collect_data(tweet.quoted_tweet, is_repost=True)
+        if not is_repost:
+            if tweet.quoted_tweet:
+                repost = self.collect_data(tweet.quoted_tweet, is_repost=True)
+            elif tweet.parent:
+                repost = self.collect_data(tweet.parent, is_repost=True)
 
         return self.result(
             content=contents,

@@ -65,6 +65,8 @@ class Tweet(Struct):
     full_text: str = field(name="text")
     quoted_tweet: "Tweet | None" = None
     """引用推文"""
+    parent: "Tweet | None" = None
+    """回复推文"""
 
     def _parse_created_at(self) -> datetime:
         """解析 ISO 8601 UTC 时间，如 '2026-03-12T14:02:40.000Z' 或 '2026-03-12T14:02:40Z'."""
