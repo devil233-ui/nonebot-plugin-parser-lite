@@ -4,6 +4,8 @@ import re
 from typing import ClassVar, TypeVar
 
 from nonebot import get_driver, logger
+from nonebot.permission import SUPERUSER
+from nonebot.rule import to_me
 from nonebot_plugin_alconna import Alconna, Args, Match, on_alconna
 from nonebot_plugin_uninfo import Uninfo
 
@@ -13,7 +15,7 @@ from ..helper import UniHelper, UniMessage
 from ..parsers import BaseParser, BilibiliParser, ParseResult
 from ..render import RENDERER
 from ..utils.common import LimitedSizeDict
-from .rule import SUPER_PRIVATE, Searched, SearchResult, on_keyword_regex
+from .rule import Searched, SearchResult, on_keyword_regex
 
 
 class LazyManager:
@@ -204,7 +206,7 @@ async def _(bv: Match[str]):
         await UniMessage("未找到可下载的音频").finish()
 
     audio_path = await DOWNLOADER.download_audio(
-        audio_url, audio_name=f"{bvid}-{page_idx}.mp3", ext_headers=parser.headers
+        audio_url, audio_name=f"{bvid}-{page_idx}.mp3"
     )
     await UniMessage(UniHelper.record_seg(audio_path)).send()
 
@@ -212,7 +214,7 @@ async def _(bv: Match[str]):
         await UniMessage(UniHelper.file_seg(audio_path)).send()
 
 
-@on_alconna(Alconna("blogin"), block=True, permission=SUPER_PRIVATE).handle()
+@on_alconna(Alconna("blogin"), block=True, permission=SUPERUSER, rule=to_me()).handle()
 async def _():
     parser = get_parser_by_type(BilibiliParser)
     qrcode = await parser.login_with_qrcode()

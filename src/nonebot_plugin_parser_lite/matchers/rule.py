@@ -9,12 +9,10 @@ from nonebot.params import Depends
 from nonebot.typing import T_State
 from nonebot.matcher import Matcher
 from nonebot.plugin.on import get_matcher_source
-from nonebot.permission import Permission
 from nonebot_plugin_uninfo import Uninfo
 from nonebot_plugin_alconna.uniseg import Hyper, UniMsg
 
 from .filter import is_enabled
-from ..config import gconfig
 
 # 统一的状态键
 PSR_SEARCHED_KEY: Literal["psr-searched"] = "psr-searched"
@@ -173,10 +171,3 @@ def on_keyword_regex(*args: tuple[str, str | re.Pattern[str]], priority: int = 5
         block=True,
         source=get_matcher_source(1),
     )
-
-
-async def _is_super_private(sess: Uninfo) -> bool:
-    return sess.scene.is_private and sess.user.id in gconfig.superusers
-
-
-SUPER_PRIVATE = Permission(_is_super_private)
