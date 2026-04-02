@@ -1,5 +1,3 @@
-from random import choice
-
 from msgspec import Struct, field
 
 
@@ -16,10 +14,11 @@ class Atlas(Struct):
 
     @property
     def img_urls(self):
-        if len(self.cdnList) == 0 or len(self.img_route_list) == 0:
+        if not self.cdnList or not self.img_route_list:
             return []
-        cdn = choice(self.cdnList).cdn
-        return [f"https://{cdn}/{url}" for url in self.img_route_list]
+
+        cdn = self.cdnList[0].cdn
+        return [f"https://{cdn}/{route}" for route in self.img_route_list]
 
 
 class ExtParams(Struct):
@@ -54,12 +53,12 @@ class Photo(Struct):
     @property
     def cover_url(self):
         """封面链接"""
-        return choice(self.coverUrls).url if len(self.coverUrls) != 0 else None
+        return self.coverUrls[0].url if self.coverUrls else None
 
     @property
     def video_url(self):
         """视频链接"""
-        return choice(self.mainMvUrls).url if len(self.mainMvUrls) != 0 else None
+        return self.mainMvUrls[0].url if self.mainMvUrls else None
 
     @property
     def img_urls(self):
