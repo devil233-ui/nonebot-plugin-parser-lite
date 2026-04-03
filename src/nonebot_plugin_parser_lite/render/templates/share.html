@@ -1,5 +1,5 @@
 <meta name="referrer" content="no-referrer" />
-<link rel="stylesheet" href="https://cdn.bootcss.com/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="https://cdn.bootcss.com/font-awesome/6.4.0/css/all.min.css" />
 <style>
   :root {
     --primary-color: #e74c3c;
@@ -44,7 +44,10 @@
     position: absolute;
     width: 100%;
     height: 5px;
-    background: linear-gradient(90deg, var(--primary-color) 0%, var(--secondary-color) 50%, #9b59b6 100%);
+    background: linear-gradient(90deg,
+        var(--primary-color) 0%,
+        var(--secondary-color) 50%,
+        #9b59b6 100%);
     top: 0;
     left: 0;
     z-index: 5;
@@ -129,7 +132,6 @@
     padding-left: 12px;
     border-left: 4px solid var(--secondary-color);
   }
-
 
   /* 评论区域 */
   .comments-section {
@@ -368,7 +370,6 @@
   .images-grid.single .image-item {
     max-height: 650px;
   }
-
 
   /* 视频封面容器：宽度占满，限制最大高度，居中内容 */
   .video-cover {
@@ -610,7 +611,7 @@
     -webkit-box-align: center;
     -ms-flex-align: center;
     align-items: center;
-    background-color: rgba(0, 0, 0, .5);
+    background-color: rgba(0, 0, 0, 0.5);
     border: none;
     border-radius: 2px;
     color: #fff;
@@ -624,22 +625,24 @@
   }
 </style>
 <script defer>
-  document.addEventListener('DOMContentLoaded', function () {
-    document.querySelectorAll('.comments-section .images-grid.single .image-item').forEach(item => {
-      const img = item.querySelector('img');
-      if (img) {
-        img.onload = function () {
-          const aspectRatio = img.height / img.width;
-          if (aspectRatio >= 0.9) {
-            item.classList.add('aspect-ratio-portrait');
-          } else {
-            item.classList.add('aspect-ratio-landscape');
+  document.addEventListener("DOMContentLoaded", function () {
+    document
+      .querySelectorAll(".comments-section .images-grid.single .image-item")
+      .forEach((item) => {
+        const img = item.querySelector("img");
+        if (img) {
+          img.onload = function () {
+            const aspectRatio = img.height / img.width;
+            if (aspectRatio >= 0.9) {
+              item.classList.add("aspect-ratio-portrait");
+            } else {
+              item.classList.add("aspect-ratio-landscape");
+            }
+          };
+          if (img.complete) {
+            img.onload();
           }
-        };
-        if (img.complete) {
-          img.onload();
         }
-      }
-    });
+      });
   });
 </script>
