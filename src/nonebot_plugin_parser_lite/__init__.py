@@ -1,5 +1,6 @@
 # ruff: noqa: E402
 import asyncio
+import traceback
 
 from nonebot import logger, require
 from nonebot.plugin import PluginMetadata, inherit_supported_adapters
@@ -63,21 +64,21 @@ async def clean_plugin_cache() -> None:
 
             if not to_delete:
                 logger.info(
-                    f"Cache files found ({len(all_files)}), "
-                    f"but none older than {reserve_hours} hour(s); skip cleaning"
+                    f"缓存文件共 {len(all_files)} 个，"
+                    f"无早于 {reserve_hours} 小时的文件，本次跳过清理"
                 )
             else:
                 tasks = [safe_unlink(file) for file in to_delete]
                 await asyncio.gather(*tasks)
                 logger.success(
-                    f"Cleaned {len(to_delete)} expired cache files "
-                    f"(kept {len(all_files) - len(to_delete)})"
+                    f"已清理 {len(to_delete)} 个过期缓存文件，"
+                    f"保留 {len(all_files) - len(to_delete)} 个"
                 )
 
         else:
-            logger.info("No cache files to clean")
+            logger.info("未找到需要清理的缓存文件")
     except Exception:
-        logger.exception("Error while cleaning cache files")
+        logger.exception(f"清理缓存文件时发生异常: {traceback.format_exc()}")
 
     # 资源清理完毕后，清理 result 缓存并重连浏览器
     clear_result_cache()
