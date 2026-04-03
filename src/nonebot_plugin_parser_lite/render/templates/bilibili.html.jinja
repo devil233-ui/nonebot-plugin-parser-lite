@@ -135,7 +135,7 @@
 
     {# 变量定义 #}
     {% set extra = result.extra if result.extra else {} %}
-    {% set comments = result.repost.comments if is_repost else result.comments %}
+    {% set comments = result.comments %}
     {% set platform = result.platform %}
     {% set content_id = extra.content_id %}
     {% set type_tag = extra.type_tag if extra.type_tag else "B站" %}
