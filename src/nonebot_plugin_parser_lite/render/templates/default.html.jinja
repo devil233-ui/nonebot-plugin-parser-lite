@@ -55,8 +55,18 @@
 
       {# Content #}
       <div>{{ render_content(result.content) }}</div>
-      {# Repost #} {% if result.repost %}
-      {{ render_card(result.repost, is_repost=True) }} {% endif %}
+      {# Repost #}
+      {% if result.repost %}
+      <div
+        style="margin-top: 20px; border: 1px solid #eee; background-color: #fafbfc; border-radius: 8px; padding: 15px;">
+        <div style="margin-bottom:10px; color:#666; font-size:14px; font-weight:600;">
+          <i class="fas fa-share" style="margin-right:5px;"></i>
+        </div>
+        <div style="width: 100%; overflow: hidden;">
+          {{ render_card(result.repost, is_repost=True) }}
+        </div>
+      </div>
+      {% endif %}
     </div>
     {# --- 评论区 --- #}
     {{ render_comments(comments) }}
