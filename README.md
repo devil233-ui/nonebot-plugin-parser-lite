@@ -51,10 +51,6 @@
 - 通用的基础模板，便于拓展自定义
 - 富文本内容渲染支持
 
-## TODO
-
-- [ ] 把所有网络请求换成 `curl_cffi`
-
 ## ⚙️ 配置
 
 > [!NOTE]
@@ -161,6 +157,4 @@ plite_max_comments=5
 - [parse-video-py](https://github.com/wujunwei928/parse-video-py) Python短视频去水印爬虫
 - [Spider_XHS](https://github.com/cv-cat/Spider_XHS) 小红书爬虫数据采集，小红书全域运营解决方案
 - [aiotieba](https://github.com/lumina37/aiotieba) 贴吧接口合集✨可用于工具箱/吧务管理/数据采集
-- [xhs](https://github.com/ReaJason/xhs) 基于小红书 Web 端进行的请求封装。
-- [xhshow](https://github.com/Cloxl/xhshow) 小红书xs纯算 小红书x-s x-s-common xsc 等字段 纯算逆向
 - 致2026年的你们
