@@ -53,7 +53,7 @@
 
 <details>
 <summary>渲染效果</summary>
-<img width="1240" height="4170" alt="3be84ec632a32a8e3b7b0ce7d6c30259" src="https://github.com/user-attachments/assets/5bd1112a-734b-4c82-afbd-fa1e8d59ae37" />
+<img width="1240" height="4464" alt="f94527b9ac540e4985231251612f1538" src="https://github.com/user-attachments/assets/9ddd9af9-26bd-4652-897c-bdd721545f5a" />
 </details>
 
 ## ⚙️ 配置
