@@ -45,6 +45,11 @@
 
 把`src/nonebot_plugin_parser_lite`文件夹复制到插件加载目录(比如`plugins`)
 
+<details>
+<summary>zssm</summary>
+在研究uv了，然后发布到pypi就可以直接安装
+</details>
+
 ## 🎈 特性
 
 - 评论区渲染支持
