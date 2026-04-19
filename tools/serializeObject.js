@@ -190,6 +190,144 @@
       "undefined",
       "NaN",
       "Infinity",
+
+      // 监听器
+      "onabort",
+      "onafterprint",
+      "onanimationcancel",
+      "onanimatinend",
+      "onanimatiooniteration",
+      "onanimationstart",
+      "onappinstalled",
+      "onauxclick",
+      "onbeforeinput",
+      "onbeforeinstallprompt",
+
+      "onbeforematch",
+
+      "onbeforeprint",
+
+      "onbeforetoggle",
+
+      "onbeforeunload",
+
+      "onbeforexrselect",
+
+      "onblur",
+
+      "oncancel",
+
+      "oncanplay",
+
+      "oncanplaythrough",
+
+      "onchange",
+
+      "onclick",
+
+      "onclose",
+      "oncommand",
+      "oncontentvisibilityautostatechange",
+      "oncontextlost",
+      "oncontextmenu",
+      "oncontextrestored",
+      "oncuechange",
+      "ondblclick",
+      "ondevicemotion",
+      "ondeviceorientation",
+      "ondeviceorientationabsolute",
+      "ondrag",
+      "ondragend",
+      "ondragenter",
+      "ondragleave",
+      "ondragover",
+      "ondragstart",
+      "ondrop",
+      "ondurationchange",
+      "onemptied",
+      "onended",
+      "onfocus",
+      "onformdata",
+      "ongamepadconnected",
+      "ongamepaddisconnected",
+      "ongotpointercapture",
+      "onhashchange",
+      "oninput",
+      "oninvalid",
+      "onkeydown",
+      "onkeypress",
+      "onkeyup",
+      "onlanguagechange",
+      "onload",
+      "onloadeddata",
+      "onloadedmetadata",
+      "onloadstart",
+      "onlostpointercapture",
+      "onmessage",
+      "onmessageerror",
+      "onmousedown",
+      "onmouseenter",
+      "onmouseleave",
+      "onmousemove",
+      "onmouseout",
+      "onmouseover",
+      "onmouseup",
+      "onmousewheel",
+      "onoffline",
+      "ononline",
+      "onpagehide",
+      "onpagereveal",
+      "onpageshow",
+      "onpageswap",
+      "onpause",
+      "onplay",
+      "onplaying",
+      "onpointercancel",
+      "onpointerdown",
+      "onpointerenter",
+      "onpointerleave",
+      "onpointermove",
+      "onpointerout",
+      "onpointerover",
+      "onpointerrawupdate",
+      "onpointerup",
+      "onpopstate",
+      "onprogress",
+      "onratechange",
+      "onrejectionhandled",
+      "onreset",
+      "onresize",
+      "onscroll",
+      "onscrollend",
+      "onscrollsnapchange",
+      "onscrollsnapchanging",
+      "onsearch",
+      "onsecuritypolicyviolation",
+      "onseeked",
+      "onseeking",
+      "onselect",
+      "onselectionchange",
+      "onselectstart",
+      "onslotchange",
+      "onstalled",
+      "onstorage",
+      "onsubmit",
+      "onsuspend",
+      "ontimeupdate",
+      "ontoggle",
+      "ontransitioncancel",
+      "ontransitionend",
+      "ontransitionrun",
+      "ontransitionstart",
+      "onunhandledrejection",
+      "onunload",
+      "onvolumechange",
+      "onwaiting",
+      "onwebkitanimationend",
+      "onwebkitanimationiteration",
+      "onwebkitanimationstart",
+      "onwebkittransitionend",
+      "onwheel",
     ]);
 
     const result = {};
@@ -198,52 +336,48 @@
       // 如果是 window 对象，特别处理，只包含非内置属性
       if (obj === window) {
         for (let prop in obj) {
-          // 检查是否是用户自定义的属性（不在内置列表中）
-          if (obj.hasOwnProperty(prop) && !browserBuiltIns.has(prop)) {
-            try {
-              const propValue = obj[prop];
+          if (!obj.hasOwnProperty(prop) || browserBuiltIns.has(prop)) continue;
 
-              // 跳过函数和可能引起安全错误的对象
-              if (typeof propValue === "function") {
+          try {
+            const propValue = obj[prop];
+
+            if (typeof propValue === "function") continue;
+
+            if (propValue != null && typeof propValue === "object") {
+              try {
+                String(propValue);
+                JSON.stringify(propValue);
+              } catch (e) {
+                // 标记为“无法安全序列化”的占位
+                result[prop] = "[Property: cannot serialize safely]";
                 continue;
               }
-
-              // 检查是否是可能导致跨域错误的对象
-              if (propValue != null && typeof propValue === "object") {
-                try {
-                  // 尝试访问一些可能暴露跨域信息的属性
-                  String(propValue); // 尝试转换为字符串
-                  JSON.stringify(propValue); // 尝试序列化
-                } catch (e) {
-                  // 如果序列化失败，跳过这个属性
-                  continue;
-                }
-              }
-
-              // 添加到结果中
-              result[prop] = propValue;
-            } catch (e) {
-              // 记录访问失败的属性
-              console.log(`Skipping property ${prop}: ${e.message}`);
             }
+
+            result[prop] = propValue;
+          } catch (e) {
+            console.log(`Skipping property ${prop}: ${e.message}`);
+            result[prop] = `[PropertyAccessError: ${e.message}]`;
           }
         }
       } else {
         // 对于非 window 对象，直接复制所有可访问的属性
         for (let prop in obj) {
+          if (!Object.prototype.hasOwnProperty.call(obj, prop)) continue;
+
           try {
-            if (obj.hasOwnProperty(prop)) {
-              const propValue = obj[prop];
+            const propValue = obj[prop];
 
-              // 跳过函数
-              if (typeof propValue === "function") {
-                continue;
-              }
-
-              result[prop] = propValue;
+            // 跳过函数
+            if (typeof propValue === "function") {
+              continue;
             }
+
+            result[prop] = propValue;
           } catch (e) {
             console.log(`Skipping property ${prop}: ${e.message}`);
+            // 在结果里也写一条占位，表示这个属性存在但无法访问
+            result[prop] = `[PropertyAccessError: ${e.message}]`;
           }
         }
       }
@@ -251,6 +385,58 @@
       console.error("Error accessing object properties:", e);
     }
 
+    // 递归安全序列化：尽量保留可序列化部分，局部失败时降级
+    const safeSerialize = (value, seen = new WeakSet()) => {
+      try {
+        if (value === null || value === undefined) return null;
+
+        const t = typeof value;
+        if (t === "string" || t === "number" || t === "boolean") return value;
+
+        // 避免 Date/RegExp 等直接 JSON.stringify 掉
+        if (value instanceof Date) return value.toISOString();
+        if (value instanceof RegExp) return String(value);
+
+        if (t === "object") {
+          // 循环引用处理
+          if (seen.has(value)) {
+            return "[Circular]";
+          }
+          seen.add(value);
+
+          // Array
+          if (Array.isArray(value)) {
+            const arr = [];
+            for (let i = 0; i < value.length; i++) {
+              try {
+                arr[i] = safeSerialize(value[i], seen);
+              } catch {
+                arr[i] = "[Item: cannot serialize]";
+              }
+            }
+            return arr;
+          }
+
+          // 普通对象
+          const objOut = {};
+          for (const key in value) {
+            if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
+            try {
+              objOut[key] = safeSerialize(value[key], seen);
+            } catch (e) {
+              objOut[key] =
+                `[Property: cannot serialize: ${e && e.message ? e.message : "unknown error"}]`;
+            }
+          }
+          return objOut;
+        }
+
+        // 其他类型一律标记
+        return "[Type: unsupported]";
+      } catch (e) {
+        return `[SerializationError: ${e.message}]`;
+      }
+    };
     // 手动构建 JSON 字符串以避免安全错误
     let jsonStr = "{";
     const entries = Object.entries(result);
@@ -259,26 +445,8 @@
       const [key, value] = entries[i];
 
       try {
-        // 安全地处理值
-        let serializedValue;
-
-        if (value === null) {
-          serializedValue = "null";
-        } else if (typeof value === "string") {
-          serializedValue = JSON.stringify(value);
-        } else if (typeof value === "number" || typeof value === "boolean") {
-          serializedValue = String(value);
-        } else if (typeof value === "object") {
-          // 对对象再次进行安全序列化
-          try {
-            JSON.stringify(value); // 测试是否可以序列化
-            serializedValue = JSON.stringify(value);
-          } catch (e) {
-            serializedValue = '"[Object: cannot serialize]"';
-          }
-        } else {
-          serializedValue = '"[Type: unsupported]"';
-        }
+        const safeValue = safeSerialize(value);
+        const serializedValue = JSON.stringify(safeValue);
 
         jsonStr += `${JSON.stringify(key)}:${serializedValue}`;
 
@@ -287,7 +455,6 @@
         }
       } catch (e) {
         jsonStr += `${JSON.stringify(key)}:"[SerializationError: ${e.message}]"`;
-
         if (i < entries.length - 1) {
           jsonStr += ",";
         }
