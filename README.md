@@ -47,8 +47,21 @@
 把`src/nonebot_plugin_parser_lite`文件夹复制到插件加载目录(比如`plugins`)
 
 <details>
-<summary>zssm</summary>
-在研究uv了，然后发布到pypi就可以直接安装
+<summary>pip</summary>
+
+```shell
+pip install -r requirements.txt
+```
+
+</details>
+
+<details>
+<summary>uv</summary>
+
+```shell
+uv add --requirements requirements.txt
+```
+
 </details>
 
 ## 🎈 特性
