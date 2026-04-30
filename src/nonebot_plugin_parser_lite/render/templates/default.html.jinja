@@ -43,19 +43,19 @@
     <script defer>
         document.addEventListener("DOMContentLoaded", function() {
             document
-                .querySelectorAll(".comment .single-image")
-                .forEach((img_container) => {
+                .querySelectorAll(".comment .single-image img")
+                .forEach((img) => {
                     const applyStyle = () => {
-                        const h = img_container.offsetHeight;
-                        const w = img_container.offsetWidth;
+                        const h = img.offsetHeight;
+                        const w = img.offsetWidth;
                         if (!h || !w || !isFinite(h / w)) return;
                         const aspectRatio = h / w;
                         if (aspectRatio >= 0.9) {
                             // 竖图：限制宽度，放高
-                            img_container.classList.add("max-w-36");
+                            img.classList.add("max-w-36", "h-auto");
                         } else {
                             // 横图：限制高度，放宽
-                            img_container.classList.add("max-h-36");
+                            img.classList.add("max-h-36", "w-auto");
                         }
                     };
                     applyStyle();
