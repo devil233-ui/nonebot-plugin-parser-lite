@@ -68,7 +68,7 @@ def generate_file_name(url: str, default_suffix: str = "") -> str:
     """
     parsed = urlparse(url)
     path = Path(parsed.path)
-    suffix = path.suffix or default_suffix
+    suffix = default_suffix or path.suffix
 
     # 只用  netloc + path 作为稳定 key，忽略 query / fragment
     stable_url = f"{parsed.netloc}{parsed.path}"
