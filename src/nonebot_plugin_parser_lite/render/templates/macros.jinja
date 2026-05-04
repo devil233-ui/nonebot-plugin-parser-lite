@@ -308,7 +308,7 @@
         {% endif %}
         {# 转发内容：嵌套一层卡片，用 is_repost=True #}
         {% if result.repost %}
-            <div class="quoue shadow-sm m-8 mt-0 rounded-xl outline-1 outline-slate-200">
+            <div class="shadow-sm m-8 mt-0 rounded-xl outline-1 outline-slate-200">
                 {{ render_content(result.repost, True) }}
             </div>
         {% endif %}
