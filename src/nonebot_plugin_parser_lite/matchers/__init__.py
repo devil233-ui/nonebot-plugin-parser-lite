@@ -158,11 +158,14 @@ async def _send_parse_result(session: Uninfo, result: ParseResult) -> None:
     """根据配置发送解析结果：先发总结图，再根据懒下载配置决定是否发送媒体。"""
     summary_msg = await RENDERER.render_messages(result)
     await summary_msg.send()
-    # 全文本内容，无需再发送媒体
-    if all(
+    # 全文本内容，测试强制走渲染器
+    is_pure_text = all(
         isinstance(c, str)
         for c in chain(result.content, result.repost.content if result.repost else [])
-    ):
+    )
+    if is_pure_text:
+        async for content_msg in RENDERER.send_content(result):
+            await content_msg.send()
         return
     if pconfig.lazy_download:
         download_cmd = ", ".join(pconfig.download_command)
@@ -198,16 +201,34 @@ async def parser_handler(
     await _send_parse_result(session, result)
 
 
-@on_alconna(Alconna("bm", Args["bv?", str, ""]), priority=3, block=True).handle()
+@on_alconna(Alconna("bm", Args["bv?", str, ""]["page?", str, ""]), priority=3, block=True).handle()
 @UniHelper.with_reaction
-async def _(bv: Match[str]):
-    text = bv.result
-    matched = re.search(r"(BV[A-Za-z0-9]{10})(\s\d{1,3})?", text)
-    if not matched:
+async def _(bv: Match[str], page: Match[str]):
+    # 修复 1：适配带空格和不带空格的各种输入习惯
+    bvid_str = bv.result if bv.available else ""
+    page_str = page.result if page.available else ""
+    
+    text = bvid_str
+    if page_str:
+        text += f" {page_str}"
+
+    bvid_match = re.search(r"(BV[A-Za-z0-9]{10})", text)
+    if not bvid_match:
         await UniMessage("请发送正确的 BV 号").finish()
 
-    bvid, page_num = matched[1], matched[2]
-    page_idx = int(page_num) if page_num else 0
+    bvid = bvid_match.group(1)
+
+    # 提取分 P 逻辑，统一使用和普通解析一致的正则
+    page_idx = 0
+    p_match = re.search(r"[?&]p=(\d+)", text)
+    if p_match:
+        page_idx = int(p_match.group(1)) - 1  # 修复 2：B站底层API的分P是0索引起步的，需要 -1
+    else:
+        parts = text.strip().split()
+        if len(parts) > 1 and parts[-1].isdigit():
+            page_idx = int(parts[-1]) - 1
+
+    page_idx = max(0, page_idx)
 
     parser = get_parser_by_type(BilibiliParser)
 
@@ -215,8 +236,16 @@ async def _(bv: Match[str]):
     if not audio_url:
         await UniMessage("未找到可下载的音频").finish()
 
+    # 修复 3：添加必要的防盗链 Header，解决 403 Forbidden 问题
+    ext_headers = {
+        "Referer": "https://www.bilibili.com",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+
     audio_path = await DOWNLOADER.download_audio(
-        audio_url, audio_name=f"{bvid}-{page_idx}.mp3"
+        audio_url, 
+        audio_name=f"{bvid}-{page_idx + 1}.mp3",
+        ext_headers=ext_headers
     )
     await UniMessage(UniHelper.record_seg(audio_path)).send()
 

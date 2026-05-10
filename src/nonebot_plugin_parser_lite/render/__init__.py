@@ -90,11 +90,9 @@ class Renderer:
         self, result: ParseResult
     ) -> AsyncGenerator[UniMessage[Any], None]:
         """发送媒体内容消息。
-
-        将解析结果中的媒体内容拆分为：
-        - 需要立即发送的音视频（逐条 yield）
-        - 可合并转发的图文 / 图片（统一收集后一次发送）
+        修改：使用 asyncio.as_completed 让音视频下载与图文构建并发执行，谁先完成谁先发。
         """
+        import asyncio
         failed_count = 0
         repost_medias = result.repost.content if result.repost else []
         media_contents = [
@@ -102,26 +100,63 @@ class Renderer:
             for cont in chain(result.content, repost_medias)
             if isinstance(cont, MediaContent) and cont.need_send
         ]
-        for cont in media_contents:
-            # 先处理需要立即发送的音视频
+
+        tasks = []
+
+        # 任务1：包装音视频下载逻辑为独立协程
+        async def wrap_media(cont: MediaContent):
+            msgs = []
+            failed = 0
             try:
                 async for msg in self.__handle_immediate_media(cont):
-                    yield msg
+                    msgs.append(msg)
             except DownloadLimitException as e:
-                yield UniMessage(str(e))
-                continue
+                msgs.append(UniMessage(str(e)))
             except DownloadException:
-                failed_count += 1
-                continue
+                failed = 1
+            return ("media", msgs, failed)
 
-        # 2构建图文 / 图片的转发列表（含主帖 + 转发，按顺序）
-        ordered_segs = await self.__build_forward_segs(result)
-        if ordered_segs:
-            if pconfig.need_forward_contents or len(ordered_segs) > 4:
-                forward_msg = UniHelper.construct_forward_message(ordered_segs)
-                yield UniMessage(forward_msg)
-            else:
-                yield UniMessage(ordered_segs)
+        for cont in media_contents:
+            tasks.append(asyncio.create_task(wrap_media(cont)))
+
+        # 任务2：包装图文/纯文字的组装与发送逻辑为独立协程
+        async def wrap_forward(res: ParseResult):
+            msgs = []
+            ordered_segs = await self.__build_forward_segs(res)
+            if ordered_segs:
+                is_pure_text = all(isinstance(seg, str) for seg in ordered_segs)
+                total_text_len = sum(len(seg) for seg in ordered_segs if isinstance(seg, str))
+
+                # 判定是否合并转发：总字数>300，或配置强制，或图文混合>4
+                need_forward = False
+                if total_text_len > 300:
+                    need_forward = True
+                elif not is_pure_text and (pconfig.need_forward_contents or len(ordered_segs) > 4):
+                    need_forward = True
+
+                if not need_forward:
+                    if is_pure_text:
+                        msgs.append(UniMessage("\n".join(ordered_segs)))
+                    else:
+                        msgs.append(UniMessage(ordered_segs))
+                else:
+                    batch_size = 4 if total_text_len > 1500 else 99
+                    for i in range(0, len(ordered_segs), batch_size):
+                        batch_segs = ordered_segs[i:i + batch_size]
+                        msgs.append(UniMessage(UniHelper.construct_forward_message(batch_segs)))
+            return ("forward", msgs, 0)
+
+        tasks.append(asyncio.create_task(wrap_forward(result)))
+
+        # 并发等待：谁先处理完就立即 yield 发送谁
+        for coro in asyncio.as_completed(tasks):
+            task_type, msgs, failed = await coro
+            failed_count += failed
+            for i, msg in enumerate(msgs):
+                yield msg
+                # 仅针对分批的合并转发，在发送间增加 1 秒延迟防风控
+                if task_type == "forward" and len(msgs) > 1 and i < len(msgs) - 1:
+                    await asyncio.sleep(1.0)
 
         # 汇总下载失败信息
         if failed_count > 0:
@@ -176,12 +211,45 @@ class Renderer:
             nodes: list[ForwardNodeInner] = []
             text_buffer: list[str] = []
 
+            if pr.title:
+                text_buffer.append(f"【{pr.title}】\n")
+
             async def flush_text() -> None:
                 nonlocal text_buffer
                 if text_buffer:
                     text = "\n".join(text_buffer).strip()
                     if text:
-                        nodes.append(f"{author_name}：{text}")
+                        chunk_size = 1000
+                        is_first = True
+                        while len(text) > chunk_size:
+                            break_point = text.rfind("\n", 0, chunk_size)
+                            if break_point == -1:
+                                for p in ("。", "！", "？", ".", "!", "?"):
+                                    pos = text.rfind(p, 0, chunk_size)
+                                    if pos > break_point:
+                                        break_point = pos
+                            if break_point == -1:
+                                for p in ("；", ";", "，", ","):
+                                    pos = text.rfind(p, 0, chunk_size)
+                                    if pos > break_point:
+                                        break_point = pos
+                            if break_point == -1:
+                                break_point = chunk_size - 1
+                            
+                            chunk = text[:break_point + 1].strip()
+                            if chunk:
+                                if is_first and len(nodes) == 0:
+                                    nodes.append(f"{author_name}：\n{chunk}")
+                                else:
+                                    nodes.append(chunk)
+                            text = text[break_point + 1:].strip()
+                            is_first = False
+                            
+                        if text:
+                            if is_first and len(nodes) == 0:
+                                nodes.append(f"{author_name}：\n{text}")
+                            else:
+                                nodes.append(text)
                     text_buffer = []
 
             async def append_media(cont: MediaContent) -> None:

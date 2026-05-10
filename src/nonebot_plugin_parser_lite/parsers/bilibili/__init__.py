@@ -178,34 +178,48 @@ class BilibiliParser(BaseParser):
         if mid in self.black_mids:
             raise TipException("该up属于黑名单")
 
-    @handle("b23.tv", r"b23\.tv/[0-9a-zA-Z._?%&+\-=/#]+")
-    @handle("bili2233", r"bili2233\.cn/[0-9a-zA-Z._?%&+\-=/#]+")
+    @handle("b23.tv", r"b23\.tv/[0-9a-zA-Z._?%&+-=/#]+")
+    @handle("bili2233", r"bili2233\.cn/[0-9a-zA-Z._?%&+-=/#]+")
     async def _parse_short_link(self, searched: Match[str]):
         """解析短链"""
         url = f"https://{searched.group(0)}"
         return await self.parse_with_redirect(url)
 
     @handle("BV", r"^(?P<bvid>BV[0-9a-zA-Z]{10})(?:\s)?(?P<page_num>\d{1,3})?$")
-    @handle(
-        "/BV",
-        r"bilibili\.com(?:/video)?/(?P<bvid>BV[0-9A-Za-z]{10})(?:[/?].*)?(?:[?&]p=(?P<page_num>\d{1,3}))?",
-    )
+    @handle("/BV", r"bilibili\.com(?:/video)?/(?P<bvid>BV[0-9A-Za-z]{10})(?:.*?[?&]p=(?P<page_num>\d{1,3}))?")
     async def _parse_bv(self, searched: Match[str]):
         """解析视频信息"""
         bvid = str(searched.group("bvid"))
-        page_num = int(searched.group("page_num") or 1)
+        page_num = 1
+        
+        # 新增：优先尝试正则匹配 ?p= 或 &p= 以及 /?p=
+        p_match = re.search(r"[?&]p=(\d+)", searched.string)
+        if p_match:
+            page_num = int(p_match.group(1))
+        else:
+            # 兜底：兼容原版空格后接数字的写法 (例如 bm BVxxx 18)
+            parts = searched.string.strip().split()
+            if len(parts) > 1 and parts[-1].isdigit():
+                page_num = int(parts[-1])
 
         return await self.parse_video(bvid=bvid, page_num=page_num)
 
     @handle("av", r"^av(?P<avid>\d{6,})(?:\s)?(?P<page_num>\d{1,3})?$")
-    @handle(
-        "/av",
-        r"bilibili\.com(?:/video)?/av(?P<avid>\d{6,})(?:\?p=(?P<page_num>\d{1,3}))?",
-    )
+    @handle("/av", r"bilibili\.com(?:/video)?/av(?P<avid>\d{6,})(?:.*?[?&]p=(?P<page_num>\d{1,3}))?")
     async def _parse_av(self, searched: Match[str]):
         """解析视频信息"""
         avid = int(searched.group("avid"))
-        page_num = int(searched.group("page_num") or 1)
+        page_num = 1
+        
+        # 新增：优先尝试正则匹配 ?p= 或 &p= 以及 /?p=
+        p_match = re.search(r"[?&]p=(\d+)", searched.string)
+        if p_match:
+            page_num = int(p_match.group(1))
+        else:
+            # 兜底：兼容原版空格后接数字的写法 (例如 bm BVxxx 18)
+            parts = searched.string.strip().split()
+            if len(parts) > 1 and parts[-1].isdigit():
+                page_num = int(parts[-1])
 
         return await self.parse_video(avid=avid, page_num=page_num)
 
