@@ -326,11 +326,19 @@ class BilibiliParser(BaseParser):
         url = f"https://bilibili.com/{video_info.bvid}"
         url += f"?p={page_info.index + 1}" if page_info.index > 0 else ""
 
-        # 视频下载任务
-        async def download_video():
+        # --- 新增：提前获取下载链接，用于给 B 站特例测算真实体积 ---
+        v_url, a_url = "", None
+        try:
             v_url, a_url = await self.extract_download_urls(
                 video=video, page_index=page_info.index
             )
+        except Exception as e:
+            logger.warning(f"获取B站直链失败: {e}")
+
+        # 视频下载任务
+        async def download_video():
+            if not v_url:
+                raise DownloadException("未能获取到可下载的视频流")
             if page_info.duration > pconfig.duration_maximum:
                 raise DurationLimitException
             if a_url is not None:
@@ -347,13 +355,36 @@ class BilibiliParser(BaseParser):
                     ext_headers=self.headers,
                 )
 
-        # 创建视频下载内容（传递下载函数而非立即执行）
+        # 创建视频下载内容
         video_content = self.create_video(
             url_or_task=download_video,
             cover_url=page_info.cover,
             duration=page_info.duration,
             ext_headers=self.headers,
         )
+        
+        # 针对 B 站特例：在这里利用提取到的真实直链算好体积塞进去
+        video_content.actual_size = "未知"
+        if v_url:
+            try:
+                import httpx
+                total_b = 0
+                calc_headers = self.headers.copy()
+                calc_headers["Accept-Encoding"] = "identity"
+                async with httpx.AsyncClient(verify=False) as client:
+                    for target in filter(None, [v_url, a_url]):
+                        resp = await client.head(target, headers=calc_headers, follow_redirects=True, timeout=4.0)
+                        cl = resp.headers.get("Content-Length")
+                        if not cl or resp.status_code in (403, 405):
+                            async with client.stream("GET", target, headers=calc_headers, follow_redirects=True) as sr:
+                                cl = sr.headers.get("Content-Length")
+                        if cl and cl.isdigit():
+                            total_b += int(cl)
+                if total_b > 0:
+                    video_content.actual_size = f"{total_b / 1048576:.1f}MB"
+            except Exception as e:
+                logger.warning(f"提前计算B站体积异常: {e}")
+        # -----------------------------------------------------------
 
         # 提取统计数据
         stats = self.create_stats()

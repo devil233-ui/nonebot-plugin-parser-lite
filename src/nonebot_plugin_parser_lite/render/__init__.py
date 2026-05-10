@@ -60,6 +60,34 @@ async def safe_src(obj: Any, method: str = "get_path") -> str:
         logger.warning(f"safe_src({method}) 处理 {type(obj).__name__} 时失败: {e}")
         return PLACEHOLDER_IMAGE
 
+async def get_actual_size(obj: Any) -> str:
+    """使用 HEAD 请求秒取媒体真实体积，完美解决卡顿问题"""
+    try:
+        import httpx
+        # 确保对象有 path_task 且包含 url
+        if hasattr(obj, "path_task") and hasattr(obj.path_task, "url"):
+            url = obj.path_task.url
+            if url:
+                headers = {
+                    "Referer": "https://www.bilibili.com",
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                }
+                async with httpx.AsyncClient() as client:
+                    # 第一梯队：尝试最高效的 HEAD 请求
+                    resp = await client.head(url, headers=headers, follow_redirects=True, timeout=5.0)
+                    content_length = resp.headers.get("Content-Length")
+                    
+                    # 兜底梯队：如果 CDN 拒绝 HEAD 请求或不返回体积，降级用流式 GET 骗取 Header 后立刻切断
+                    if not content_length or resp.status_code == 403:
+                        async with client.stream("GET", url, headers=headers, follow_redirects=True) as stream_resp:
+                            content_length = stream_resp.headers.get("Content-Length")
+
+                    if content_length and content_length.isdigit():
+                        size_mb = int(content_length) / (1024 * 1024)
+                        return f"{size_mb:.1f}MB"
+    except Exception as e:
+        logger.warning(f"获取媒体真实体积失败: {e}")
+    return "未知"
 
 class Renderer:
     """统一的渲染器，将解析结果转换为消息"""
@@ -398,6 +426,78 @@ class Renderer:
 
     async def resolve_parse_result(self, result: ParseResult) -> dict[str, Any]:
         """解析 ParseResult 为模板可用的字典数据"""
+
+        import httpx
+        from nonebot import logger
+
+        async def _get_url_size(target_url: str, tag: str) -> int:
+            if not target_url or not isinstance(target_url, str) or not target_url.startswith("http"):
+                logger.warning(f"[体积测算] {tag} URL无效或为空: {target_url}")
+                return 0
+                
+            headers = {
+                "Referer": "https://www.bilibili.com",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "*/*",
+                "Accept-Encoding": "identity"
+            }
+            logger.info(f"[体积测算] 开始测算 {tag}，URL前60字符: {target_url[:60]}...")
+            
+            try:
+                async with httpx.AsyncClient(verify=False) as client:
+                    resp = await client.head(target_url, headers=headers, follow_redirects=True, timeout=5.0)
+                    cl = resp.headers.get("Content-Length")
+                    logger.info(f"[体积测算] {tag} HEAD状态码: {resp.status_code}, Content-Length: {cl}")
+                    
+                    if not cl or resp.status_code in (403, 405):
+                        logger.info(f"[体积测算] {tag} HEAD失败，尝试流式 GET 骗取 Header...")
+                        async with client.stream("GET", target_url, headers=headers, follow_redirects=True) as sr:
+                            cl = sr.headers.get("Content-Length")
+                            logger.info(f"[体积测算] {tag} GET状态码: {sr.status_code}, Content-Length: {cl}")
+                            
+                    if cl and cl.isdigit():
+                        size = int(cl)
+                        logger.info(f"[体积测算] {tag} 成功拿到体积: {size} Bytes")
+                        return size
+                    else:
+                        logger.warning(f"[体积测算] {tag} 最终未能提取到有效的 Content-Length")
+            except Exception as e:
+                logger.error(f"[体积测算] {tag} 获取体积时发生网络异常: {e}")
+            return 0
+
+        for cont in result.content:
+            if isinstance(cont, VideoContent):
+                # 如果其它平台（比如 B 站）自己已经提前算好了真实体积，直接跳过通用测算！
+                if getattr(cont, "actual_size", "未知") != "未知":
+                    logger.info(f"[渲染预处理] 已携带真实体积 {cont.actual_size}，跳过测算")
+                    continue
+                    
+                cont.actual_size = "未知"
+                try:
+                    total_bytes = 0
+                    logger.info(f"[渲染预处理] 解析视频对象, path_task: {cont.path_task}")
+                    
+                    # 1. 拿主视频流大小
+                    main_url = getattr(cont.path_task, "url", None)
+                    total_bytes += await _get_url_size(main_url, "主视频")
+                    
+                    # 2. 拿可能存在的音频流大小
+                    kwargs = getattr(cont.path_task, "kwargs", {})
+                    logger.info(f"[渲染预处理] path_task kwargs: {kwargs}")
+                    
+                    if kwargs and "audio_url" in kwargs:
+                        total_bytes += await _get_url_size(kwargs.get("audio_url"), "独立音频")
+                    elif hasattr(cont, "audio_url"): # 兜底某些可能直接挂载属性的写法
+                        total_bytes += await _get_url_size(getattr(cont, "audio_url"), "独立音频属性")
+                    
+                    if total_bytes > 0:
+                        cont.actual_size = f"{total_bytes / 1048576:.1f}MB"
+                        logger.info(f"[渲染预处理] 计算完毕，总体积为: {cont.actual_size}")
+                    else:
+                        logger.warning("[渲染预处理] 总体积计算为 0，保留 '未知'")
+                        
+                except Exception as e:
+                    logger.error(f"[渲染预处理] 计算视频总体积严重异常: {e}")
 
         data: dict[str, Any] = {
             "title": result.title,

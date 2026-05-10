@@ -43,6 +43,8 @@ class VideoContent(MediaContent):
     """视频封面"""
     duration: float = 0.0
     """时长 单位: 秒"""
+    actual_size: str = "未知"
+    """实际体积"""
 
     async def get_cover_path(self) -> Path | None:
         return None if self.cover is None else await self.cover
