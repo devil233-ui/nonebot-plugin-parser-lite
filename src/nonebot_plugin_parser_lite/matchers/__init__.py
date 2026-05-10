@@ -92,13 +92,15 @@ def _get_enabled_parser_classes() -> list[type[BaseParser]]:
 
 
 # 关键词 -> Parser 映射
-KEYWORD_PARSER_MAP: dict[str, BaseParser] = {}
 T = TypeVar("T", bound=BaseParser)
+
+_ALL_PARSERS: list[BaseParser] = []
+_KEYWORD_PARSER_MAP: dict[str, BaseParser] = {}
 
 
 def get_parser(keyword: str) -> BaseParser:
     """根据注册的关键字获取对应的解析器实例。"""
-    parser = KEYWORD_PARSER_MAP.get(keyword)
+    parser = _KEYWORD_PARSER_MAP.get(keyword)
     if parser is None:
         raise KeyError(f"未找到关键字 {keyword!r} 对应的 parser")
     return parser
@@ -106,7 +108,7 @@ def get_parser(keyword: str) -> BaseParser:
 
 def get_parser_by_type(parser_type: type[T]) -> T:
     """根据解析器类型获取已注册的解析器实例。"""
-    for parser in KEYWORD_PARSER_MAP.values():
+    for parser in _ALL_PARSERS:
         if isinstance(parser, parser_type):
             return parser
     raise ValueError(f"未找到类型为 {parser_type.__name__} 的 parser 实例")
@@ -114,23 +116,19 @@ def get_parser_by_type(parser_type: type[T]) -> T:
 
 driver = get_driver()
 
-ENABLED_PLATFORM: list[BaseParser] = []
-
 
 @driver.on_startup
 def register_parser_matcher() -> None:
     """在启动时注册各平台解析器及其匹配规则。"""
-    global ENABLED_PLATFORM
     enabled_classes = _get_enabled_parser_classes()
 
     enabled_platforms: list[str] = []
     for parser_cls in enabled_classes:
         parser = parser_cls()
-        ENABLED_PLATFORM.append(parser)
+        _ALL_PARSERS.append(parser)
         enabled_platforms.append(parser.platform.display_name)
         for keyword, _ in parser_cls._key_patterns:
-            KEYWORD_PARSER_MAP[keyword] = parser
-
+            _KEYWORD_PARSER_MAP[keyword] = parser
     logger.info(f"启用平台: {', '.join(sorted(enabled_platforms))}")
 
     patterns = [pattern for cls_ in enabled_classes for pattern in cls_._key_patterns]
@@ -140,10 +138,10 @@ def register_parser_matcher() -> None:
 
 @driver.on_shutdown
 async def close_httpx() -> None:
-    if not ENABLED_PLATFORM:
+    if not _ALL_PARSERS:
         return
 
-    await asyncio.gather(*(parser.aclose() for parser in ENABLED_PLATFORM))
+    await asyncio.gather(*(parser.aclose() for parser in _ALL_PARSERS))
 
 
 # 缓存结果
@@ -222,7 +220,7 @@ async def _(bv: Match[str], page: Match[str]):
     page_idx = 0
     p_match = re.search(r"[?&]p=(\d+)", text)
     if p_match:
-        page_idx = int(p_match.group(1)) - 1  # 修复 2：B站底层API的分P是0索引起步的，需要 -1
+        page_idx = int(p_match.group(1)) - 1
     else:
         parts = text.strip().split()
         if len(parts) > 1 and parts[-1].isdigit():
@@ -236,21 +234,16 @@ async def _(bv: Match[str], page: Match[str]):
     if not audio_url:
         await UniMessage("未找到可下载的音频").finish()
 
-    # 修复 3：添加必要的防盗链 Header，解决 403 Forbidden 问题
-    ext_headers = {
-        "Referer": "https://www.bilibili.com",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    }
-
     audio_path = await DOWNLOADER.download_audio(
         audio_url, 
         audio_name=f"{bvid}-{page_idx + 1}.mp3",
-        ext_headers=ext_headers
+        ext_headers=parser.headers
     )
-    await UniMessage(UniHelper.record_seg(audio_path)).send()
-
+    
     if pconfig.need_upload_audio:
         await UniMessage(UniHelper.file_seg(audio_path)).send()
+    else:
+        await UniMessage(UniHelper.record_seg(audio_path)).send()
 
 
 @on_alconna(Alconna("blogin"), block=True, permission=SUPERUSER, rule=to_me()).handle()
