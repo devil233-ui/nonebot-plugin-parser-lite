@@ -73,7 +73,7 @@ uv add --requirements requirements.txt
 
 <details>
 <summary>渲染效果</summary>
-<img width="1240" height="4464" alt="f94527b9ac540e4985231251612f1538" src="https://github.com/user-attachments/assets/9ddd9af9-26bd-4652-897c-bdd721545f5a" />
+<img width="1240" height="2880" alt="142f794a8df94207bf742c75434c942b" src="https://github.com/user-attachments/assets/7c73228d-bf1c-44e1-96be-adcf9ef32f85" />
 </details>
 
 ## ⚙️ 配置
