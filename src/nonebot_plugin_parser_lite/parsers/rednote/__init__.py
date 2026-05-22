@@ -49,13 +49,21 @@ class RedNoteParser(BaseParser):
     # https://www.xiaohongshu.com/explore/691e68a8000000001e02bcda?xsec_token=CBwYRkYkdf7BHsEy2bVC9-ZYDHXJDjIRl6QI8xzqm-gEg
     @handle(
         "xiaohongshu.com",
+        # 坚决不使用 params={"xsec_token": {}}，防止上游缺陷正则搞破坏
         r"(?P<type>explore|search_result|discovery/item)/(?P<note_id>[0-9a-zA-Z]+)",
-        params={"xsec_token": {}},
     )
     async def _parse_common(self, searched: MatchWithParams):
-        # parse_type = searched["type"]
         note_id = searched["note_id"]
-        xsec_token = searched["xsec_token"]
+        
+        # 终极暴力提取：绕过框架，直接从完整字符串中把 token 抠出来！
+        import re
+        full_text = getattr(searched, "string", str(searched))
+        xsec_match = re.search(r"xsec_token=([^&\s]+)", full_text)
+        
+        if not xsec_match:
+            raise ParseException("缺少 xsec_token, 无法解析小红书链接")
+            
+        xsec_token = xsec_match.group(1)
 
         url = f"https://www.xiaohongshu.com/explore/{note_id}?xsec_token={xsec_token}&xsec_source=pc_share"
 

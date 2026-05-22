@@ -180,6 +180,7 @@ class BilibiliParser(BaseParser):
     @handle("b23.tv", r"b23\.tv/[0-9a-zA-Z._?%&+\-=/#]+")
     @handle("bili2233", r"bili2233\.cn/[0-9a-zA-Z._?%&+\-=/#]+")
     async def _parse_short_link(self, searched: MatchWithParams):
+
         """解析短链"""
         url = f"https://{searched.url}"
         return await self.parse_with_redirect(url)
@@ -189,7 +190,7 @@ class BilibiliParser(BaseParser):
         r"bilibili\.com(?:/video)?/(?P<bvid>BV[0-9A-Za-z]{10})",
         params={"p": {"default": "1", "as_int": True, "required": False}},
     )
-    @handle("BV", r"^(?P<bvid>BV[0-9a-zA-Z]{10})(?:\s)?(?P<p>\d{1,3})?$")
+
     async def _parse_bv(self, searched: MatchWithParams):
         """解析视频信息"""
         bvid = searched["bvid"]
@@ -202,12 +203,11 @@ class BilibiliParser(BaseParser):
         r"bilibili\.com(?:/video)?/av(?P<avid>\d{6,})",
         params={"p": {"default": "1", "as_int": True, "required": False}},
     )
-    @handle("av", r"^av(?P<avid>\d{6,})(?:\s)?(?P<p>\d{1,3})?$")
+
     async def _parse_av(self, searched: MatchWithParams):
         """解析视频信息"""
         avid = int(searched["avid"])
         page_num = int(searched["p"])
-
         return await self.parse_video(avid=avid, page_num=page_num)
 
     @handle("/dynamic/", r"bilibili\.com/dynamic/(?P<dynamic_id>\d+)")

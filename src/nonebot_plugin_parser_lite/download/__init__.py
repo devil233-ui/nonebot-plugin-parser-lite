@@ -126,6 +126,11 @@ class StreamDownloader:
         headers: dict[str, str],
         desc: str,
     ) -> None:
+        # ✨ 新增：在一切开始前，拦截非法的占位符 URL，防止死循环重试
+        if not url or not url.startswith("http"):
+            logger.warning(f"检测到无效的下载链接: '{url}'，跳过该媒体。")
+            raise DownloadException(f"无效的媒体下载链接: {url}")
+            
         def parse_content_length(header_val: str | None) -> int | None:
             if not header_val:
                 return None
@@ -141,29 +146,83 @@ class StreamDownloader:
             file_size_mb = content_length / 1024 / 1024
             if file_size_mb > pconfig.max_size:
                 logger.warning(
-                    f"媒体 url: {url} 大小 {file_size_mb:.2f} MB 超过 {pconfig.max_size} MB, 取消下载"  # noqa: E501
+                    f"媒体 url: {url} 大小 {file_size_mb:.2f} MB 超过 {pconfig.max_size} MB, 取消下载"
                 )
                 raise SizeLimitException(file_size_mb)
 
-        async with self.client.stream(
-            "GET", url, headers=headers, follow_redirects=True
-        ) as response:
+        max_retries = 100  # ✨ B站爱切片，那我们就奉陪到底，把重试次数拉到 100 次！
+        for attempt in range(max_retries):
+            existing_size = 0
+            if await file_path.exists():
+                existing_size = (await file_path.stat()).st_size
+
+            req_headers = headers.copy()
+            
+            # ✨ 核心：全面学习 kkkkkk-10086 的稳健请求头策略
+            req_headers["Accept"] = "*/*"
+            req_headers["Accept-Encoding"] = "identity" # 拒绝服务器压缩，还原最真实的流
+            # 如果是重试，强制要求 CDN 建立全新的 TCP 连接，避免复用被污染/限速的旧通道
+            req_headers["Connection"] = "close" if attempt > 0 else "keep-alive"
+
+            if existing_size > 0:
+                req_headers["Range"] = f"bytes={existing_size}-"
+                logger.info(f"检测到未完成文件，尝试断点续传，已下载: {existing_size / 1048576:.2f} MB")
+
             try:
-                response.raise_for_status()
+                # 注意：httpx client 有时候默认带压缩，我们显式用 req_headers 覆盖
+                async with self.client.stream(
+                    "GET", url, headers=req_headers, follow_redirects=True
+                ) as response:
+                    
+                    if response.status_code == 416:
+                        logger.warning("断点续传失败 (416)，文件可能已损坏，将重新下载")
+                        await safe_unlink(file_path)
+                        raise DownloadException("416 Range Not Satisfiable")
+                        
+                    response.raise_for_status()
+
+                    is_resume = response.status_code == 206
+                    if not is_resume and existing_size > 0:
+                        logger.debug("服务器当前不支持断点续传或忽略了 Range 头，将覆盖重新下载")
+                        existing_size = 0
+                        await safe_unlink(file_path)
+
+                    header_cl = parse_content_length(response.headers.get("Content-Length"))
+                    total_length = header_cl
+                    if is_resume and header_cl is not None:
+                        total_length = existing_size + header_cl
+
+                    if total_length is not None:
+                        check_declared_size(total_length)
+
+                    await self._write_stream_to_file(
+                        response=response,
+                        file_path=file_path,
+                        desc=desc,
+                        declared_length=total_length,
+                        url=url,
+                        existing_size=existing_size,
+                        is_resume=is_resume
+                    )
+                
+                # 下载彻底成功，直接退出重试循环！
+                return 
+
+            except (SizeLimitException, ZeroSizeException):
+                raise  
             except Exception as e:
-                raise DownloadException from e
-            content_length = parse_content_length(
-                response.headers.get("Content-Length")
-            )
-            if content_length is not None:
-                check_declared_size(content_length)
-            await self._write_stream_to_file(
-                response=response,
-                file_path=file_path,
-                desc=desc,
-                declared_length=content_length,
-                url=url,
-            )
+                # 记录报错，如果是常规的 peer closed connection，不再用红字吓人
+                if "peer closed connection" in str(e):
+                    logger.info(f"B站CDN触发防刷机制强行切片，当作正常分片处理。马上发起续传... ({attempt + 1}/{max_retries})")
+                else:
+                    logger.warning(f"下载中断，准备进行第 {attempt + 1} 次重试续传: {e}")
+                    
+                if attempt < max_retries - 1:
+                    import asyncio
+                    # ✨ 核心：不要傻等 2 秒！B站切片是正常机制，我们直接 0.5 秒内光速重连拿下下一块！
+                    await asyncio.sleep(0.5) 
+                else:
+                    raise DownloadException(f"已经被掐断 {max_retries} 次了，彻底放弃治疗: {e}") from e
 
     async def _write_stream_to_file(
         self,
@@ -172,12 +231,21 @@ class StreamDownloader:
         desc: str,
         declared_length: int | None,
         url: str,
+        existing_size: int = 0,
+        is_resume: bool = False
     ) -> None:
-        """将 HTTP 流写入文件，并处理进度条与实际大小限制。"""
+        """将 HTTP 流写入文件，并处理进度条与实际大小限制。支持断点续传。"""
         with self.rich_progress(desc, declared_length) as update_progress:
-            downloaded_bytes = 0
+            downloaded_bytes = existing_size
+            
+            # 如果是续传，先把进度条推到已下载的位置
+            if existing_size > 0 and is_resume:
+                update_progress(advance=existing_size)
 
-            async with aiofiles.open(file_path, "wb") as file:
+            # ✨ 核心：续传用追加模式 'ab'，全新下载用覆盖模式 'wb'
+            mode = "ab" if is_resume else "wb"
+            
+            async with aiofiles.open(file_path, mode) as file:
                 async for chunk in response.aiter_bytes(1024 * 1024):
                     if not chunk:
                         continue
@@ -186,7 +254,7 @@ class StreamDownloader:
                     chunk_len = len(chunk)
                     downloaded_bytes += chunk_len
 
-                    # 更新进度条（无 Content-Length 时显示“已下载字节数”）
+                    # 更新进度条
                     update_progress(advance=chunk_len)
 
                     # 无 Content-Length 时，按实际已下载大小做限制
@@ -194,9 +262,15 @@ class StreamDownloader:
                         file_size_mb = downloaded_bytes / 1024 / 1024
                         if file_size_mb > pconfig.max_size:
                             logger.warning(
-                                f"媒体 url: {url} 实际下载大小 {file_size_mb:.2f} MB 超过 {pconfig.max_size} MB, 取消下载"  # noqa: E501
+                                f"媒体 url: {url} 实际下载大小 {file_size_mb:.2f} MB 超过 {pconfig.max_size} MB, 取消下载"
                             )
                             raise SizeLimitException(file_size_mb)
+
+            # 断点与完整性校验（校验失败同样会抛出异常触发下次续传）
+            if declared_length is not None and downloaded_bytes < declared_length:
+                raise DownloadException(
+                    f"文件下载不完整 (已下载 {downloaded_bytes} / 声明 {declared_length} bytes)"
+                )
 
     @auto_task
     async def download_video(
@@ -396,7 +470,7 @@ class StreamDownloader:
         """
 
         logger.info(f"[StreamDownloader] 开始解析 m3u8: {m3u8_url}")
-        content = await self.text(m3u8_url)
+        content = await self._fetch_text(m3u8_url)
         base_url = m3u8_url.rsplit("/", 1)[0] + "/"
 
         # 检查是否是 Master Playlist (包含子 m3u8 链接)
@@ -440,39 +514,24 @@ class StreamDownloader:
         )
         return ts_urls
 
-    async def text(self, url: str, ext_headers: dict[str, str] | None = None) -> str:
+    async def _fetch_text(self, url: str) -> str:
         """
         获取文本内容
 
         :param url: 目标文本资源的链接地址
-        :param ext_headers: 额外的请求头，会与默认请求头合并
 
         :return: 响应体的文本内容
         :raise DownloadException: 请求状态码非 200 时抛出
         """
-        headers = {**self.headers, **(ext_headers or {})}
-        resp = await self.client.get(url, headers=headers, follow_redirects=True)
+        # 准备请求 headers
+        fetch_headers = self.headers.copy()
+        # 使用 get 方法获取完整响应
+        resp = await self.client.get(
+            url, headers=fetch_headers, timeout=10, follow_redirects=True
+        )
         if resp.status_code != 200:
             raise DownloadException(f"请求失败: {resp.status_code}")
         return resp.text
-
-    async def content(
-        self, url: str, ext_headers: dict[str, str] | None = None
-    ) -> bytes:
-        """
-        获取内容
-
-        :param url: 目标资源的链接地址
-        :param ext_headers: 额外的请求头，会与默认请求头合并
-
-        :return: 响应体的内容
-        :raise DownloadException: 请求状态码非 200 时抛出
-        """
-        headers = {**self.headers, **(ext_headers or {})}
-        resp = await self.client.get(url, headers=headers, follow_redirects=True)
-        if resp.status_code != 200:
-            raise DownloadException(f"请求失败: {resp.status_code}")
-        return resp.content
 
     async def _has_ffmpeg(self) -> bool:
         """
