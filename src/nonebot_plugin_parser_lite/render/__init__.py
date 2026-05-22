@@ -33,6 +33,60 @@ from ..parsers.data import (
 PLACEHOLDER_IMAGE = (
     "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
 )
+SPLIT_THRESHOLD = pconfig.forward_text_threshold
+"""单段文本拆分阈值"""
+MAX_FORWARD_TEXT_LEN = 4500
+"""单个 forward 文本总长上限"""
+MAX_FORWARD_NODES = 90
+"""单个 forward 节点数上限"""
+
+
+def split_text_by_length_with_punct(text: str, max_len: int) -> list[str]:
+    """按长度切分文本，优先在标点符号处断句。
+
+    规则：
+    1. 遍历文本，当前段长度超过 max_len 时：
+       - 尝试在当前段中最后一个标点符号后断句；
+       - 若找不到合适标点，则在 max_len 处硬切。
+    2. 支持中英文常用标点。
+
+    :param text: 原始文本
+    :param max_len: 每段最大长度
+    :return: 切分后的文本段列表
+    """
+    if max_len <= 0 or len(text) <= max_len:
+        return [text]
+
+    # 常见句末/停顿标点（中英文）
+    puncts = "。！？!?；;，,、…"
+    result: list[str] = []
+    start = 0
+    length = len(text)
+
+    while start < length:
+        # 预算本段的理论结束位置
+        end = min(start + max_len, length)
+        segment = text[start:end]
+
+        if end == length:
+            # 已到末尾，直接收尾
+            result.append(segment)
+            break
+
+        cut_pos = next(
+            (i + 1 for i in range(len(segment) - 1, -1, -1) if segment[i] in puncts),
+            -1,
+        )
+        if cut_pos <= 0:
+            # 没找到合适标点，直接在 max_len 处切
+            result.append(segment)
+            start = end
+        else:
+            # 在标点后断句
+            result.append(segment[:cut_pos])
+            start += cut_pos
+
+    return [seg for seg in result if seg]
 
 
 async def safe_src(obj: Any, method: str = "get_path") -> str:
@@ -131,83 +185,76 @@ class Renderer:
         # 2 构建图文 / 图片的转发列表（含主帖 + 转发，按顺序）
         ordered_segs = await self.__build_forward_segs(result)
         if ordered_segs:
-            # 配置阈值（提供默认值，避免旧配置缺失时报错）
-            text_threshold = pconfig.forward_text_threshold
-            max_plain_len = pconfig.forward_text_max_length
-
-            # 先决定是否需要走“合并转发”路径
-            # 这里用一次遍历同时统计：
-            # - 总纯文字长度
-            # - 节点数量
+            # 一次遍历：统计+长文本拆分
+            processed_segs: list[ForwardNodeInner] = []
             total_plain_len = 0
             node_count = 0
+
             for seg in ordered_segs:
                 node_count += 1
                 if isinstance(seg, str):
-                    total_plain_len += len(seg)
+                    seg_len = len(seg)
+                    total_plain_len += seg_len
+                    if seg_len > SPLIT_THRESHOLD:
+                        parts = split_text_by_length_with_punct(seg, SPLIT_THRESHOLD)
+                        for part in parts:
+                            if not part:
+                                continue
+                            processed_segs.append(part)
+                    else:
+                        processed_segs.append(seg)
+                else:
+                    processed_segs.append(seg)
 
             # 是否需要合并转发：
             # 1) 配置项 need_forward_contents
             # 2) 纯文字部分超过阈值
-            # 3) 节点数较多（兼容原来的 len > 4 逻辑）
+            # 3) 节点数较多
             need_forward = (
                 pconfig.need_forward_contents
-                or total_plain_len > text_threshold
+                or total_plain_len > SPLIT_THRESHOLD
                 or node_count > 4
             )
 
             if not need_forward:
-                # 直接一次性发出普通消息列表
-                yield UniMessage(ordered_segs)
+                # 不走合并转发：直接按节点顺序发出
+                yield UniMessage(processed_segs)
             else:
-                # 需要合并转发；如果纯文字总长度不大，直接构造一个转发即可
-                if total_plain_len <= max_plain_len:
-                    forward_msg = UniHelper.construct_forward_message(ordered_segs)
-                    yield UniMessage(forward_msg)
-                else:
-                    # 纯文字太长：按纯文字长度分批构造多个转发消息
-                    batch: list[ForwardNodeInner] = []
-                    batch_plain_len = 0
+                # 需要合并转发：根据平台限制按文本长度 / 节点数分批构造 forward
+                current_chunk: list[ForwardNodeInner] = []
+                current_text_len = 0
+                current_nodes = 0
 
-                    def flush_batch() -> UniMessage[Any] | None:
-                        nonlocal batch, batch_plain_len
-                        if not batch:
-                            return None
-                        msg = UniMessage(UniHelper.construct_forward_message(batch))
-                        batch = []
-                        batch_plain_len = 0
-                        return msg
+                def flush_chunk() -> UniMessage[Any] | None:
+                    nonlocal current_chunk, current_text_len, current_nodes
+                    if not current_chunk:
+                        return None
+                    msg = UniMessage(UniHelper.construct_forward_message(current_chunk))
+                    current_chunk.clear()
+                    current_text_len = 0
+                    current_nodes = 0
+                    return msg
 
-                    for seg in ordered_segs:
-                        seg_plain = len(seg) if isinstance(seg, str) else 0
+                for seg in processed_segs:
+                    seg_text_len = len(seg) if isinstance(seg, str) else 0
 
-                        # 情况 1：
-                        # 当前 batch 非空，且再加上这个 seg 会超过上限 -> 先发出当前批次
-                        if batch and batch_plain_len + seg_plain > max_plain_len:
-                            msg = flush_batch()
-                            if msg is not None:
-                                yield msg
+                    # 如果加上当前节点会超出单个 forward 限制，则先 flush 当前 chunk
+                    if current_chunk and (
+                        current_text_len + seg_text_len > MAX_FORWARD_TEXT_LEN
+                        or current_nodes + 1 > MAX_FORWARD_NODES
+                    ):
+                        msg = flush_chunk()
+                        if msg is not None:
+                            yield msg
 
-                        # 情况 2：
-                        # 该 seg 自身就超过上限 -> 独立成一个批次发送
-                        if isinstance(seg, str) and seg_plain > max_plain_len:
-                            for start in range(0, seg_plain, max_plain_len):
-                                part = seg[start : start + max_plain_len]
-                                yield UniMessage(
-                                    UniHelper.construct_forward_message([part])
-                                )
-                            # 不把这个 seg 放入后续 batch
-                            continue
+                    current_chunk.append(seg)
+                    current_text_len += seg_text_len
+                    current_nodes += 1
 
-                        # 情况 3：
-                        # 正常累加到当前批次
-                        batch.append(seg)
-                        batch_plain_len += seg_plain
-
-                    # 收尾
-                    last_msg = flush_batch()
-                    if last_msg is not None:
-                        yield last_msg
+                # 收尾：还有未发送的 chunk
+                last_msg = flush_chunk()
+                if last_msg is not None:
+                    yield last_msg
 
         # 汇总下载失败信息
         if failed_count > 0:
