@@ -152,11 +152,9 @@ class Renderer:
         self, result: ParseResult
     ) -> AsyncGenerator[UniMessage[Any], None]:
         """发送媒体内容消息。
-
-        将解析结果中的媒体内容拆分为：
-        - 需要立即发送的音视频（逐条 yield）
-        - 可合并转发的图文 / 图片（统一收集后一次发送）
+        修改：使用 asyncio.as_completed 让音视频下载与图文构建并发执行，谁先完成谁先发。
         """
+        import asyncio
         failed_count = 0
         repost_medias = result.repost.content if result.repost else []
         media_contents = [
@@ -164,104 +162,81 @@ class Renderer:
             for cont in chain(result.content, repost_medias)
             if isinstance(cont, MediaContent) and cont.need_send
         ]
-        for cont in media_contents:
-            # 先处理需要立即发送的音视频
+
+        tasks = []
+
+        # 任务1：包装音视频下载逻辑为独立协程
+        async def wrap_media(cont: MediaContent):
+            msgs = []
+            failed = 0
             try:
                 async for msg in self.__handle_immediate_media(cont):
-                    yield msg
+                    msgs.append(msg)
             except SizeLimitException as e:
-                yield UniMessage(
+                msgs.append(UniMessage(
                     f"设定的最大上传大小为 {pconfig.max_size}MB\n"
                     f"当前解析到的媒体大小为 {e.size}MB\n"
                     "媒体太大了~"
-                )
-                continue
+                ))
             except DurationLimitException as e:
-                yield UniMessage(
+                msgs.append(UniMessage(
                     f"设定的最大时长为 {pconfig.duration_maximum}s\n"
                     f"当前解析到的媒体时长为 {e.duration}s\n"
                     "媒体太长了~"
-                )
-            except DownloadException:
-                failed_count += 1
+                ))
+            except Exception as e:
+                # 终极兜底：捕获 httpx.ReadError 等一切漏网的未知网络异常
                 logger.error(
-                    f"{cont.__class__.__name__} 下载失败:\n{traceback.format_exc()}"
+                    f"{cont.__class__.__name__} 下载过程中发生异常:\n{traceback.format_exc()}"
                 )
-                continue
+                failed = 1
+            return ("media", msgs, failed)
 
-        # 2 构建图文 / 图片的转发列表（含主帖 + 转发，按顺序）
-        ordered_segs = await self.__build_forward_segs(result)
-        if ordered_segs:
-            # 一次遍历：统计+长文本拆分
-            processed_segs: list[ForwardNodeInner] = []
-            total_plain_len = 0
-            node_count = 0
+        for cont in media_contents:
+            tasks.append(asyncio.create_task(wrap_media(cont)))
 
-            for seg in ordered_segs:
-                node_count += 1
-                if isinstance(seg, str):
-                    seg_len = len(seg)
-                    total_plain_len += seg_len
-                    if seg_len > SPLIT_THRESHOLD:
-                        parts = split_text_by_length_with_punct(seg, SPLIT_THRESHOLD)
-                        for part in parts:
-                            if not part:
-                                continue
-                            processed_segs.append(part)
+        # 任务2：包装图文/纯文字的组装与发送逻辑为独立协程（使用咱们更干脆的动态装箱逻辑 + 配置项读取）
+        async def wrap_forward(res: ParseResult):
+            msgs = []
+            ordered_segs = await self.__build_forward_segs(res)
+            if ordered_segs:
+                is_pure_text = all(isinstance(seg, str) for seg in ordered_segs)
+                total_text_len = sum(len(seg) for seg in ordered_segs if isinstance(seg, str))
+
+                # 判定是否合并转发：总字数超标，或配置强制，或图文混合超标
+                need_forward = False
+                if total_text_len > pconfig.forward_text_threshold:
+                    need_forward = True
+                elif not is_pure_text and (pconfig.need_forward_contents or len(ordered_segs) > pconfig.forward_node_threshold):
+                    need_forward = True
+
+                if not need_forward:
+                    if is_pure_text:
+                        msgs.append(UniMessage("\n".join(ordered_segs)))
                     else:
-                        processed_segs.append(seg)
+                        msgs.append(UniMessage(ordered_segs))
                 else:
-                    processed_segs.append(seg)
+                    batch_size = (
+                        pconfig.forward_small_batch_size 
+                        if total_text_len > pconfig.forward_long_text_threshold 
+                        else pconfig.forward_large_batch_size
+                    )
+                    for i in range(0, len(ordered_segs), batch_size):
+                        batch_segs = ordered_segs[i:i + batch_size]
+                        msgs.append(UniMessage(UniHelper.construct_forward_message(batch_segs)))
+            return ("forward", msgs, 0)
 
-            # 是否需要合并转发：
-            # 1) 配置项 need_forward_contents
-            # 2) 纯文字部分超过阈值
-            # 3) 节点数较多
-            need_forward = (
-                pconfig.need_forward_contents
-                or total_plain_len > SPLIT_THRESHOLD
-                or node_count > 4
-            )
+        tasks.append(asyncio.create_task(wrap_forward(result)))
 
-            if not need_forward:
-                # 不走合并转发：直接按节点顺序发出
-                yield UniMessage(processed_segs)
-            else:
-                # 需要合并转发：根据平台限制按文本长度 / 节点数分批构造 forward
-                current_chunk: list[ForwardNodeInner] = []
-                current_text_len = 0
-                current_nodes = 0
-
-                def flush_chunk() -> UniMessage[Any] | None:
-                    nonlocal current_chunk, current_text_len, current_nodes
-                    if not current_chunk:
-                        return None
-                    msg = UniMessage(UniHelper.construct_forward_message(current_chunk))
-                    current_chunk.clear()
-                    current_text_len = 0
-                    current_nodes = 0
-                    return msg
-
-                for seg in processed_segs:
-                    seg_text_len = len(seg) if isinstance(seg, str) else 0
-
-                    # 如果加上当前节点会超出单个 forward 限制，则先 flush 当前 chunk
-                    if current_chunk and (
-                        current_text_len + seg_text_len > MAX_FORWARD_TEXT_LEN
-                        or current_nodes + 1 > MAX_FORWARD_NODES
-                    ):
-                        msg = flush_chunk()
-                        if msg is not None:
-                            yield msg
-
-                    current_chunk.append(seg)
-                    current_text_len += seg_text_len
-                    current_nodes += 1
-
-                # 收尾：还有未发送的 chunk
-                last_msg = flush_chunk()
-                if last_msg is not None:
-                    yield last_msg
+        # 并发等待：谁先处理完就立即 yield 发送谁
+        for coro in asyncio.as_completed(tasks):
+            task_type, msgs, failed = await coro
+            failed_count += failed
+            for i, msg in enumerate(msgs):
+                yield msg
+                # 仅针对分批的合并转发，在发送间增加 1 秒延迟防风控
+                if task_type == "forward" and len(msgs) > 1 and i < len(msgs) - 1:
+                    await asyncio.sleep(1.0)
 
         # 汇总下载失败信息
         if failed_count > 0:
@@ -321,12 +296,45 @@ class Renderer:
             nodes: list[ForwardNodeInner] = []
             text_buffer: list[str] = []
 
+            if pr.title:
+                text_buffer.append(f"【{pr.title}】\n")
+
             async def flush_text() -> None:
                 nonlocal text_buffer
                 if text_buffer:
                     text = "\n".join(text_buffer).strip()
                     if text:
-                        nodes.append(f"{author_name}：{text}")
+                        chunk_size = 1000
+                        is_first = True
+                        while len(text) > chunk_size:
+                            break_point = text.rfind("\n", 0, chunk_size)
+                            if break_point == -1:
+                                for p in ("。", "！", "？", ".", "!", "?"):
+                                    pos = text.rfind(p, 0, chunk_size)
+                                    if pos > break_point:
+                                        break_point = pos
+                            if break_point == -1:
+                                for p in ("；", ";", "，", ","):
+                                    pos = text.rfind(p, 0, chunk_size)
+                                    if pos > break_point:
+                                        break_point = pos
+                            if break_point == -1:
+                                break_point = chunk_size - 1
+                            
+                            chunk = text[:break_point + 1].strip()
+                            if chunk:
+                                if is_first and len(nodes) == 0:
+                                    nodes.append(f"{author_name}：\n{chunk}")
+                                else:
+                                    nodes.append(chunk)
+                            text = text[break_point + 1:].strip()
+                            is_first = False
+                            
+                        if text:
+                            if is_first and len(nodes) == 0:
+                                nodes.append(f"{author_name}：\n{text}")
+                            else:
+                                nodes.append(text)
                     text_buffer = []
 
             async def append_media(cont: MediaContent) -> None:
@@ -467,6 +475,59 @@ class Renderer:
 
     async def resolve_parse_result(self, result: ParseResult) -> dict[str, Any]:
         """解析 ParseResult 为模板可用的字典数据"""
+
+        # --- 提前极速获取视频体积并挂载属性 ---
+        import httpx
+        from nonebot import logger
+
+        async def _get_url_size(target_url: str) -> int:
+            if not target_url or not isinstance(target_url, str) or not target_url.startswith("http"):
+                return 0
+                
+            headers = {
+                "Referer": "https://www.bilibili.com",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "Accept": "*/*",
+                "Accept-Encoding": "identity"
+            }
+            
+            try:
+                async with httpx.AsyncClient(verify=False) as client:
+                    resp = await client.head(target_url, headers=headers, follow_redirects=True, timeout=4.0)
+                    cl = resp.headers.get("Content-Length")
+                    
+                    if not cl or resp.status_code in (403, 405):
+                        async with client.stream("GET", target_url, headers=headers, follow_redirects=True) as sr:
+                            cl = sr.headers.get("Content-Length")
+                            
+                    if cl and cl.isdigit():
+                        return int(cl)
+            except Exception as e:
+                logger.warning(f"获取体积失败: {e}")
+            return 0
+
+        for cont in result.content:
+            if isinstance(cont, VideoContent):
+                try:
+                    total_bytes = 0
+                    
+                    # 1. 拿主视频流大小
+                    main_url = getattr(cont.path_task, "url", None)
+                    total_bytes += await _get_url_size(main_url)
+                    
+                    # 2. 拿可能存在的音频流大小（适配 B 站分轨）
+                    kwargs = getattr(cont.path_task, "kwargs", {})
+                    if kwargs and "audio_url" in kwargs:
+                        total_bytes += await _get_url_size(kwargs.get("audio_url"))
+                    elif hasattr(cont, "audio_url"):
+                        total_bytes += await _get_url_size(getattr(cont, "audio_url"))
+                    
+                    if total_bytes > 0:
+                        # ✨ 核心融合：将算好的总体积塞给官方合法的内置属性
+                        cont._size_bytes = total_bytes
+                        
+                except Exception as e:
+                    logger.error(f"计算视频总体积异常: {e}")
 
         data: dict[str, Any] = {
             "title": result.title,
