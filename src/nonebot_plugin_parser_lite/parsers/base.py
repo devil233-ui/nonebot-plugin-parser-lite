@@ -122,7 +122,7 @@ class BaseParser:
 
     if TYPE_CHECKING:
         _key_patterns: ClassVar[KeyPatterns]
-        _handlers: ClassVar[dict[str, HandlerFunc]]
+        _handlers: ClassVar[dict[str, list[tuple[Pattern[str], HandlerFunc]]]]
 
     def __init__(self):
         self.headers = COMMON_HEADER.copy()
@@ -143,7 +143,7 @@ class BaseParser:
         if ABC not in cls.__bases__:  # 跳过抽象类
             BaseParser._registry.append(cls)
 
-        cls._handlers = {}
+        cls._handlers: dict[str, list[tuple[Pattern[str], HandlerFunc]]] = {}
         cls._key_patterns = []
 
         # 获取所有被 handle 装饰的方法
@@ -153,10 +153,11 @@ class BaseParser:
                 key_patterns: KeyPatterns = getattr(attr, _KEY_PATTERNS)
                 handler = cast(HandlerFunc, attr)
                 for keyword, pattern in key_patterns:
-                    cls._handlers[keyword] = handler
+                    # 记录 keyword -> (pattern, handler) 列表
+                    cls._handlers.setdefault(keyword, []).append((pattern, handler))
                     cls._key_patterns.append((keyword, pattern))
 
-        # 按关键字长度降序排序
+        # 按关键字长度降序排序（search_url 仍然按原逻辑）
         cls._key_patterns.sort(key=lambda x: -len(x[0]))
 
     @classmethod
@@ -166,16 +167,28 @@ class BaseParser:
 
     @final
     async def parse(self, keyword: str, searched: Match[str]) -> ParseResult:
-        """解析 URL 提取信息
+        """解析 URL 提取信息。
 
         :param keyword: 关键词
         :param searched: 正则表达式匹配对象，由平台对应的模式匹配得到
-
         :return: 解析结果
-
-        :raise: 解析失败时抛出
+        :raise ParseException: 未找到匹配的 handler 时抛出
         """
-        return await self._handlers[keyword](self, searched)
+        handlers = self._handlers.get(keyword)
+        if not handlers:
+            raise ParseException(f"未找到关键字 {keyword!r} 对应的 handler")
+
+        text = searched.group(0)
+        for pattern, handler in handlers:
+            # pattern 是当初 handle 时 compile 出来的正则
+            # 这里用 search/fullmatch 都可以，search 更宽松
+            if pattern.search(text):
+                return await handler(self, searched)
+
+        # 理论上不该走到这里，防御性错误
+        raise ParseException(
+            f"关键字 {keyword!r} 存在 handler 但无任何模式匹配 {text!r}"
+        )
 
     @retry(max_retries=3)
     async def parse_with_redirect(
