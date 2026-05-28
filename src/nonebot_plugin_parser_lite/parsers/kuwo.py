@@ -77,7 +77,7 @@ class KuWoParser(BaseParser):
         }
 
         return self.result(
-            title=music_data["title"],
+            title=music_data["name"],
             author=self.create_author(name=music_data["artist"]),
             url=f"https://www.kuwo.cn/play_detail/{rid}",
             content=contents,
