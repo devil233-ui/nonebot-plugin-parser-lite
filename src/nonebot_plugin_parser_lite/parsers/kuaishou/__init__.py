@@ -10,6 +10,7 @@ from ..base import (
     ParseException,
     Platform,
     PlatformEnum,
+    TipException,
     handle,
     pconfig,
 )
@@ -68,7 +69,7 @@ class KuaiShouParser(BaseParser):
 
         status = vision_video_detail_data.get("status")
         if status != 1:
-            raise ParseException("不支持解析的视频")
+            raise TipException("不支持解析的视频") # 比如图集
 
         try:
             response = await self.httpx.post(
