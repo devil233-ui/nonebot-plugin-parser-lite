@@ -1,5 +1,6 @@
 """使用 DrissionPage 启动浏览器，优先使用系统/Playwright/Puppeteer 已安装的内核."""
 
+import asyncio
 import contextlib
 import os
 import platform
@@ -17,7 +18,8 @@ driver = get_driver()
 
 
 class BrowserManager:
-    BROWSER: Chromium
+    BROWSER: Chromium | None = None
+    _init_lock: asyncio.Lock = asyncio.Lock()
 
     @staticmethod
     async def _find_browser_from_system() -> str:
@@ -152,6 +154,8 @@ class BrowserManager:
 
     @classmethod
     async def start(cls):
+        if cls.BROWSER is not None:
+            return
         browser_path = await cls._resolve_browser_path()
 
         if system == "Linux":
@@ -174,44 +178,39 @@ class BrowserManager:
 
     @classmethod
     def reconnect(cls):
-        if getattr(cls, "BROWSER", None) is None:
-            logger.warning(
-                "BrowserManager.reconnect() called but BROWSER is not initialized."
-            )
+        if cls.BROWSER is None:
             return
         cls.BROWSER.reconnect()
 
     @classmethod
     def clear_cache(cls):
-        if getattr(cls, "BROWSER", None) is None:
-            logger.info(
-                "BrowserManager.clear_cache() called but BROWSER is not initialized."
-            )
+        if cls.BROWSER is None:
             return
         cls.BROWSER.clear_cache(cookies=False)
 
     @classmethod
-    def new_tab(cls, *args, **kwargs):
-        if getattr(cls, "BROWSER", None) is None:
-            raise RuntimeError(
-                "BrowserManager.new_tab() called before browser initialization"
-            )
+    async def ensure_started(cls) -> None:
+        """确保浏览器已启动，若未启动则启动（惰性初始化）"""
+        if cls.BROWSER is not None:
+            return
+        async with cls._init_lock:
+            if cls.BROWSER is None:
+                await cls.start()
+
+    @classmethod
+    async def new_tab(cls, *args, **kwargs):
+        await cls.ensure_started()
+        assert cls.BROWSER
         return cls.BROWSER.new_tab(*args, **kwargs)
 
     @classmethod
     def quit(cls):
-        if getattr(cls, "BROWSER", None) is None:
-            logger.info("BrowserManager.quit() called but BROWSER is not initialized.")
+        if cls.BROWSER is None:
             return
+        logger.info("Closing browser launched by Parser Lite")
         cls.BROWSER.quit(del_data=True)
-
-
-@driver.on_startup
-async def start_browser():
-    await BrowserManager.start()
 
 
 @driver.on_shutdown
 def close_browser():
-    logger.info("Closing browser launched by Parser Lite")
     BrowserManager.quit()
