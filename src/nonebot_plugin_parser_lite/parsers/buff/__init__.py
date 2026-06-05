@@ -108,7 +108,10 @@ class BuffParser(BaseParser):
             timestamp=video.publish_time,
             url=video.share_data.url,
             author=self.create_author(
-                name=video.author, avatar_url=video.avatar, id=video.user_id
+                name=video.author,
+                avatar_url=video.avatar,
+                id=video.user_id,
+                location=video.ip_location,
             ),
             stats=self.create_stats(
                 view_count=format_num(video.views),
@@ -144,7 +147,10 @@ class BuffParser(BaseParser):
             timestamp=gallery.preview.publish_time,
             url=gallery.preview.share_data.url,
             author=self.create_author(
-                name=author.nickname, avatar_url=author.avatar, id=author.user_id
+                name=author.nickname,
+                avatar_url=author.avatar,
+                id=author.user_id,
+                location=author.ip_location,
             ),
             stats=self.create_stats(
                 like_count=format_num(gallery.preview.ups_num),
@@ -172,7 +178,10 @@ class BuffParser(BaseParser):
             timestamp=news.publish_time,
             url=news.share_data.url,
             author=self.create_author(
-                name=news.author, avatar_url=news.avatar, id=news.user_id
+                name=news.author,
+                avatar_url=news.avatar,
+                id=news.user_id,
+                location=news.ip_location,
             ),
             stats=self.create_stats(
                 view_count=format_num(news.views),
@@ -204,6 +213,7 @@ class BuffParser(BaseParser):
                 name=author.nickname,
                 avatar_url=author.avatar,
                 id=author.user_id,
+                location=author.ip_location,
             ),
             timestamp=item.publish_time,
             url=item.share_data.url,
