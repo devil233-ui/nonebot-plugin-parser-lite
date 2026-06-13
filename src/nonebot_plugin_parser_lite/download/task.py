@@ -33,6 +33,9 @@ class DownloadTaskWrapper(Awaitable[T], Generic[T]):
         coro = self._func(*self._args, **self._kwargs)
         return coro.__await__()
 
+    def __repr__(self) -> str:
+        return self.url
+
 
 def auto_task(
     func: Callable[P, Coroutine[Any, Any, T]],
