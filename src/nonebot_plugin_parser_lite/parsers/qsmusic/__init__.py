@@ -19,7 +19,6 @@ ROUTER_DATA = re.compile(
 
 
 class QSMusicParser(BaseParser):
-    # 平台信息
     platform: ClassVar[Platform] = Platform(
         name=PlatformEnum.QSMUSIC, display_name="汽水音乐"
     )
@@ -46,12 +45,9 @@ class QSMusicParser(BaseParser):
                 audio_name=f"{music_data.trackName}.mp3",
             )
         ]
-        text = f"专辑: {music_data.trackInfo.album.name}"
-        lyrics = (music_data.lyrics or "").strip()
-        text += f"\n歌词:\n{lyrics}" if lyrics else "\n歌词: 暂无"
-        # 构建额外信息
         extra = {
-            "lyric": text,
+            "album": music_data.trackInfo.album.name,
+            "lyric": music_data.lyrics,
             "type": "audio",
             "type_tag": "音乐",
             "type_icon": "fa-music",

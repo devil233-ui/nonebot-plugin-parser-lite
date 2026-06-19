@@ -130,7 +130,6 @@ class KuGouParser(BaseParser):
         if not _hash:
             raise ParseException(f"未找到歌曲hash: {share_url}")
 
-        # 获取歌曲信息
         response = await self.httpx.get(
             f"https://m.kugou.com/app/i/getSongInfo.php?cmd=playInfo&hash={_hash}"
         )
@@ -140,7 +139,6 @@ class KuGouParser(BaseParser):
                 f"酷狗音乐解析失败: {playinfo.errcode} {playinfo.error}"
             )
 
-        # 创建音频内容
         audio_url = playinfo.url
         if not audio_url:
             raise ParseException("未找到音频资源")
@@ -156,7 +154,6 @@ class KuGouParser(BaseParser):
             name=playinfo.singerName  # , playinfo.imgUrl.format(size=480)
         )
 
-        # 获取歌词列表
         response = await self.httpx.get(
             f"https://krcs.kugou.com/search?hash={playinfo.hash}"
         )
@@ -166,18 +163,13 @@ class KuGouParser(BaseParser):
         if not krcs.candidates:
             raise ParseException("未找到歌词")
 
-        # 获取歌词内容
         response = await self.httpx.get(
             f"https://lyrics.kugou.com/download?ver=1&id={krcs.candidates[0].id}&accesskey={krcs.candidates[0].accesskey}&fmt=lrc"
         )
         lyrics = Decoder(Lyrics).decode(response.content)
         if lyrics.error_code != 0:
             raise ParseException(f"酷狗音乐解析失败: 歌词获取失败: {lyrics.info}")
-        # 构建歌词文本
         lyric = base64.b64decode(lyrics.content).decode(lyrics.charset)
-        text = f"歌词:\n{lyric}"
-
-        # 创建封面图片内容
         cover_url = playinfo.album_img.format(size=480)
         contents: list[MediaContent] = [
             self.create_image(url=cover_url, need_send=False)
@@ -190,7 +182,7 @@ class KuGouParser(BaseParser):
             "info": f"比特率: {playinfo.bitRate}K | "
             f"时长: {int(float(playinfo.timeLength) // 60)}"
             f":{int(float(playinfo.timeLength) % 60):02d}",
-            "lyric": text,
+            "lyric": lyric,
             "type": "audio",
             "type_tag": "音乐",
             "type_icon": "fa-music",

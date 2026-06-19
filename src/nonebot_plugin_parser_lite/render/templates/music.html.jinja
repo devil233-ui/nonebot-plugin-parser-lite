@@ -193,7 +193,6 @@
     </head>
     <body>
         <div class="music-card">
-            <!-- 右上角二维码 -->
             {% if result.qr_code_path %}<img src="{{ result.qr_code_path }}" alt="二维码" class="qr-code" />{% endif %}
             <div class="header">
                 <!-- 专辑图 -->
@@ -203,24 +202,15 @@
                     <h1 class="title">{{ result.title }}</h1>
                     <p class="artist">{{ result.author.name }}</p>
                     <!-- 专辑名 -->
-                    {% if result.extra and '专辑:' in result.extra.lyric %}
-                        <p class="album">
-                            {{ result.extra.lyric.split("专辑:")[1] .split('\n')[0].strip() if '\n' in
-                            result.extra.lyric else
-                            result.extra.lyric.split('专辑:')[1].strip() }}
-                        </p>
-                    {% endif %}
+                    {% if result.extra and result.extra.album %}<p class="album">{{ result.extra.album }}</p>{% endif %}
                     <div class="platform">{{ result.platform.display_name }}</div>
                 </div>
             </div>
             <!-- 歌词展示 -->
-            {% if result.extra and '歌词' in result.extra.lyric %}
+            {% if result.extra and result.extra.lyric %}
                 <div class="lyric-container">
                     <h2 class="lyric-title">歌词</h2>
-                    <div class="lyric">
-                        {{ result.extra.lyric.split("歌词:\n")[1] if '歌词:\n' in result.extra.lyric else
-                        result.extra.lyric }}
-                    </div>
+                    <div class="lyric">{{ result.extra.lyric }}</div>
                 </div>
             {% endif %}
             <!-- 右下角音质和大小 -->

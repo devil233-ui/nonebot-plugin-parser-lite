@@ -32,6 +32,7 @@ class KuWoParser(BaseParser):
     platform: ClassVar[Platform] = Platform(
         name=PlatformEnum.KUWO, display_name="酷我音乐"
     )
+
     @handle("kuwo.cn", r"play_detail/(\d+)")
     async def _parse_kuwo_share(self, searched: MatchWithParams):
         """解析酷我音乐分享链接"""
@@ -44,11 +45,8 @@ class KuWoParser(BaseParser):
         )
         resp.raise_for_status()
         data = resp.json()
-
-        # 检查接口返回状态
         if data["code"] != 200:
             raise ParseException(f"酷我音乐接口返回错误: {data.get('msg', '未知错误')}")
-
         music_data = data["data"]
         audio_url = music_data["url"]
         if not audio_url.startswith("http"):
@@ -58,9 +56,6 @@ class KuWoParser(BaseParser):
         audio_content = self.create_audio(audio_url, duration, audio_name=audio_name)
         dis_dura = display_duration(music_data["duration"])
 
-        text = f"专辑: {music_data['album']}\n时长: {dis_dura}"
-        if lyric := music_data.get("lyric"):
-            text += f"\n歌词:\n{lyric}"
         contents: list[MediaContent] = []
         if cover_url := music_data.get("pic"):
             contents.append(self.create_image(cover_url, need_send=False))
@@ -68,8 +63,9 @@ class KuWoParser(BaseParser):
         contents.append(audio_content)
 
         extra = {
-            "info": f"时长: {dis_dura} | 专辑: {music_data['album']}",
-            "lyric": text,
+            "album": music_data.get("album"),
+            "info": f"时长: {dis_dura}",
+            "lyric": music_data.get("lyric"),
             "type": "audio",
             "type_tag": "音乐",
             "type_icon": "fa-music",
