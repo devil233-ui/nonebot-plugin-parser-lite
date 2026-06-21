@@ -119,7 +119,7 @@ async def safe_src(
         src = await call_result if isinstance(call_result, Awaitable) else call_result
         return src.as_uri()  # 若不存在此属性，进入exception分支判断
     except Exception as e:
-        logger.warning(f"safe_src({method}) 处理 {type(obj).__name__} 时失败: {e}")
+        logger.warning(f"safe_src({method}) 处理 {type(obj).__name__} 时失败: {e!r}")
         return None if return_none_on_fail else PLACEHOLDER_IMAGE
 
 
