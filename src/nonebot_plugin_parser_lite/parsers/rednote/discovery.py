@@ -78,7 +78,7 @@ class Video(Struct):
     @property
     def url(self) -> str:
         """主视频直链"""
-        return f"httpss://sns-video-bd.xhscdn.com/{self.consumer.originVideoKey}"
+        return f"https://sns-video-bd.xhscdn.com/{self.consumer.originVideoKey}"
 
 
 class Image(Struct):
