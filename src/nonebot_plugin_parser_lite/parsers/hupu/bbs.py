@@ -9,6 +9,7 @@ from ...data import Comment
 from .util import parse_rich_content
 
 _HUPU_RELATIVE_RE = re.compile(r"(\d+)(天|小时|分钟|秒)前")
+_HUPU_ABSOLUTE_RE = re.compile(r"^\d{4}-")
 
 
 def parse_hupu_date(date_str: str) -> int:
@@ -17,23 +18,28 @@ def parse_hupu_date(date_str: str) -> int:
     now_dt = datetime.now()
     if date_str == "刚刚":
         return int(now_dt.timestamp())
-
     if m := _HUPU_RELATIVE_RE.match(date_str):
         value = int(m[1])
         unit = m[2]
         if unit == "天":
             dt = now_dt - timedelta(days=value)
+            dt = dt.replace(hour=0, minute=0, second=0, microsecond=0)
         elif unit == "小时":
             dt = now_dt - timedelta(hours=value)
+            dt = dt.replace(minute=0, second=0, microsecond=0)
         elif unit == "分钟":
             dt = now_dt - timedelta(minutes=value)
+            dt = dt.replace(second=0, microsecond=0)
         else:
             dt = now_dt - timedelta(seconds=value)
+            dt = dt.replace(microsecond=0)
         return int(dt.timestamp())
-
     try:
-        year = now_dt.year
-        dt = datetime.strptime(f"{year}-{date_str}", "%Y-%m-%d %H:%M")
+        if _HUPU_ABSOLUTE_RE.match(date_str):
+            dt = datetime.strptime(date_str, "%Y-%m-%d")
+        else:
+            year = now_dt.year
+            dt = datetime.strptime(f"{year}-{date_str}", "%Y-%m-%d %H:%M")
         return int(dt.timestamp())
     except Exception as e:
         raise ValueError(f"无法解析时间字符串: {date_str!r}") from e
@@ -61,9 +67,9 @@ class Detail(Struct):
     user: User
     title: str
     html: str = field(name="content")
-    hits: str
-    replies: str
-    lights: str
+    hits: str | int
+    replies: str | int
+    lights: str | int
     via: str
     """发帖签名档信息"""
 
