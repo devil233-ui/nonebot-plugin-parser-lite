@@ -36,7 +36,7 @@ PLACEHOLDER_IMAGE = (
 )
 SPLIT_THRESHOLD = pconfig.forward_text_threshold
 """单段文本拆分阈值"""
-MAX_FORWARD_TEXT_LEN = 4500
+MAX_FORWARD_TEXT_LEN = 30000
 """单个 forward 文本总长上限"""
 MAX_FORWARD_NODES = 90
 """单个 forward 节点数上限"""

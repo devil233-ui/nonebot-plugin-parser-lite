@@ -56,8 +56,8 @@ class Config(BaseModel):
     """是否使用无头浏览器"""
     plite_max_comments: int = 5
     """最大评论数量"""
-    plite_forward_text_threshold: int = 300
-    """纯文本文本长度阈值，超过此长度的文本将会强制转发"""
+    plite_forward_text_threshold: int = 1000
+    """纯文本文本长度阈值，超过此长度的文本将会强制转发(最大4500)"""
 
     @property
     def nickname(self) -> str:

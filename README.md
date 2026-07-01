@@ -180,7 +180,7 @@ plite_headless=False
 plite_max_comments=5
 
 # [可选] 纯文本文本长度阈值，超过此长度的文本将会强制转发
-plite_forward_text_threshold=300
+plite_forward_text_threshold=1000
 ```
 
 </details>
