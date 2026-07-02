@@ -169,19 +169,12 @@ class Renderer:
             try:
                 async for msg in self.__handle_immediate_media(cont):
                     yield msg
-            except SizeLimitException as e:
-                yield UniMessage(
-                    f"设定的最大上传大小为 {pconfig.max_size}MB\n"
-                    f"当前解析到的媒体大小为 {e.size}MB\n"
-                    "媒体太大了~"
-                )
+            except SizeLimitException:
+                yield UniMessage(f"媒体太大啦，还是去{result.platform.name}看看吧~")
                 continue
-            except DurationLimitException as e:
-                yield UniMessage(
-                    f"设定的最大时长为 {pconfig.duration_maximum}s\n"
-                    f"当前解析到的媒体时长为 {e.duration}s\n"
-                    "媒体太长了~"
-                )
+            except DurationLimitException:
+                yield UniMessage(f"媒体太长啦，还是去{result.platform.name}看看吧~")
+                continue
             except DownloadException:
                 failed_count += 1
                 logger.error(
