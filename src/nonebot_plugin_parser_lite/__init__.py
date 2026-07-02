@@ -1,5 +1,3 @@
-import traceback
-
 from nonebot import logger, require
 from nonebot.plugin import PluginMetadata, inherit_supported_adapters
 
@@ -41,8 +39,8 @@ async def clean_plugin_cache() -> None:
 
     try:
         await CacheManager.clean_expired()
-    except Exception:
-        logger.exception(f"清理缓存文件时发生异常: {traceback.format_exc()}")
+    except Exception as e:
+        logger.exception(f"清理缓存文件时发生异常: {e!r}")
 
     # 资源清理完毕后，清理 result 缓存并重连浏览器
     clear_result_cache()

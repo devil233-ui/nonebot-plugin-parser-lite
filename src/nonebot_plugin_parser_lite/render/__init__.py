@@ -3,7 +3,6 @@ from collections.abc import AsyncGenerator, Awaitable
 import datetime
 from io import BytesIO
 from itertools import chain
-import traceback
 from typing import Any, ClassVar
 import uuid
 
@@ -137,8 +136,8 @@ class Renderer:
         # 尝试获取图片路径，以便在直接发送失败时使用文件发送
         try:
             image_seg = await self.cache_or_render_image(result)
-        except Exception:
-            logger.error(f"获取图片路径失败: {traceback.format_exc()}")
+        except Exception as e:
+            logger.exception(f"获取图片路径失败: {e!r}")
             image_seg = None
 
         # 尝试直接发送图片
@@ -175,11 +174,9 @@ class Renderer:
             except DurationLimitException:
                 yield UniMessage(f"媒体太长啦，还是去{result.platform.name}看看吧~")
                 continue
-            except DownloadException:
+            except DownloadException as e:
                 failed_count += 1
-                logger.error(
-                    f"{cont.__class__.__name__} 下载失败:\n{traceback.format_exc()}"
-                )
+                logger.exception(f"{cont.__class__.__name__} 下载失败: {e!r}")
                 continue
 
         # 2 构建图文 / 图片的转发列表（含主帖 + 转发，按顺序）
