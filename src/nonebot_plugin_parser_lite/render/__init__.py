@@ -171,10 +171,14 @@ class Renderer:
                 async for msg in self.__handle_immediate_media(cont):
                     yield msg
             except SizeLimitException:
-                yield UniMessage(f"媒体太大啦，还是去{result.platform.name}看看吧~")
+                yield UniMessage(
+                    f"媒体太大啦，还是去{result.platform.display_name}看看吧~"
+                )
                 continue
             except DurationLimitException:
-                yield UniMessage(f"媒体太长啦，还是去{result.platform.name}看看吧~")
+                yield UniMessage(
+                    f"媒体太长啦，还是去{result.platform.display_name}看看吧~"
+                )
                 continue
             except DownloadException as e:
                 failed_count += 1
