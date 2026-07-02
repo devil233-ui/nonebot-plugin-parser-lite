@@ -1,9 +1,9 @@
 import base64
-from collections.abc import AsyncGenerator, Awaitable
+from collections.abc import AsyncGenerator, Awaitable, Callable
 import datetime
 from io import BytesIO
 from itertools import chain
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
 import uuid
 
 from anyio import Path
@@ -96,27 +96,29 @@ async def safe_src(
     通用安全资源获取过滤器
 
     用法：
-        {{ cont | safe_src }}                    # 默认调用 get_path()
-        {{ cont | safe_src("get_base") }}        # 调用 get_base()
-        {{ cont | safe_src("get_cover_path") }}  # 调用 get_cover_path()
-        {{ author | safe_src("get_avatar_path", return_none_on_fail=True) }} #
-        调用 get_avatar_path(), 在获取失败时返回`None`而不是空白图片
+    ```
+        # 默认调用 get_path()
+        {{ cont | safe_src }}
+        # 调用 get_base()
+        {{ cont | safe_src("get_base") }}
+        # 调用 get_cover_path()
+        {{ cont | safe_src("get_cover_path") }}
+        #调用 get_avatar_path(), 在获取失败时返回`None`而不是空白图片
+        {{ author | safe_src("get_avatar_path", return_none_on_fail=True) }}
+    ```
     """
     try:
         if not hasattr(obj, method):
             logger.warning(f"对象 {type(obj).__name__} 不存在方法 '{method}'")
             return None if return_none_on_fail else PLACEHOLDER_IMAGE
-
-        method_attr = getattr(obj, method)
-
-        if not callable(method_attr):
+        attr = getattr(obj, method)
+        if not callable(attr):
             logger.warning(f"{type(obj).__name__} 的属性 '{method}' 不是可调用对象")
             return None if return_none_on_fail else PLACEHOLDER_IMAGE
-
-        call_result: Path | Awaitable[Path] = method_attr()  # type: ignore[assignment]
-
+        method_attr = cast(Callable[[], Path | Awaitable[Path]], attr)
+        call_result = method_attr()
         src = await call_result if isinstance(call_result, Awaitable) else call_result
-        return src.as_uri()  # 若不存在此属性，进入exception分支判断
+        return src.as_uri()
     except Exception as e:
         logger.warning(f"safe_src({method}) 处理 {type(obj).__name__} 时失败: {e!r}")
         return None if return_none_on_fail else PLACEHOLDER_IMAGE
