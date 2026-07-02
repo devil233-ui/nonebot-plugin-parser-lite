@@ -17,6 +17,7 @@ from ..data import (
     AudioContent,
     GraphicContent,
     ImageContent,
+    LinkContent,
     LivePhotoContent,
     MediaContent,
     ParseResult,
@@ -378,14 +379,16 @@ class Renderer:
             for item in pr.content:
                 if isinstance(item, str):
                     # 文本：缓冲，遇到媒体或结束时 flush
-                    if item:
-                        text_buffer.append(item)
+                    if text := item.strip():
+                        text_buffer.append(text)
                 elif isinstance(item, StickerContent):
                     text_buffer.append(item.desc or "[表情]")
                 elif isinstance(item, MediaContent) and item.need_send:
                     # 媒体：先输出之前的文本，再输出媒体段
                     await flush_text()
                     await append_media(item)
+                elif isinstance(item, LinkContent):
+                    text_buffer.append(item.url)
                 else:
                     # 其他类型暂不处理
                     continue
