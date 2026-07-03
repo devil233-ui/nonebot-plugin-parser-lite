@@ -105,11 +105,11 @@ uv add --requirements requirements.txt
 API_TIMEOUT=30.0
 
 # [可选] B 站 cookie, 必须含有 SESSDATA 项，可附加 B 站 AI 总结功能
-# 如果需要长期使用此凭据则不应该在浏览器登录账户导致 cookie 被刷新，建议注册个小号获取
-# 各项获取方式 https://nemo2011.github.io/bilibili-api/#/get-credential
-# ac_time_value 相对特殊，仅用于刷新 Cookies
-# B站网页打开开发者工具，进入控制台，输入 window.localStorage.ac_time_value 即可获取其值。
-plite_bili_ck="SESSDATA=xxxxxxxxxx;ac_time_value=131231241231241"
+# 获取方式
+# B站网页打开开发者工具，切换到网络标签页，刷新后点击一个类型为`fetch`的网络请求复制请求头中 Cookie 的全部内容
+# 若希望cookie会自动刷新,请进入控制台，输入 window.localStorage.ac_time_value 并执行即可获取其值。
+# 然后按照如下格式填写，xxxx为你的 Cookie 内容, abc 为 ac_time_value 的值
+plite_bili_ck="xxxxxxxxxx;ac_time_value=abc"
 
 # [可选] 允许的 B 站视频编码，越靠前的编码优先级越高
 # 可选 "avc"(H.264，体积较大), "hev"(HEVC), "av01"(AV1), "unknown"(未知)
