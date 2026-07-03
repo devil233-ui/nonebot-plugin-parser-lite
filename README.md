@@ -101,8 +101,8 @@ uv add --requirements requirements.txt
 <summary>配置项</summary>
 
 ```bash
-# [可选] nonebot2 内置配置，若服务器上传带宽太低，建议调高，防止超时
-API_TIMEOUT=30.0
+# [可选] nonebot2 内置配置，若服务器上传带宽太低或报错发送消息超时，建议调高，防止超时
+API_TIMEOUT=100
 
 # [可选] B 站 cookie, 必须含有 SESSDATA 项，可附加 B 站 AI 总结功能
 # 获取方式（觉得麻烦可以看最下面的指令扫码登陆）
