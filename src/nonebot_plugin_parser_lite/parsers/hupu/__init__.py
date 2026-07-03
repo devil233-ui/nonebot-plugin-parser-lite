@@ -30,6 +30,7 @@ class HupuParser(BaseParser):
         sign = md5(sign_str.encode("utf-8")).hexdigest()
         params["sign"] = sign
         resp = await self.httpx.get(url, params=params)
+        resp.raise_for_status()
         return decoder.decode(resp.content)
 
     # 图文
