@@ -105,7 +105,7 @@ uv add --requirements requirements.txt
 API_TIMEOUT=30.0
 
 # [可选] B 站 cookie, 必须含有 SESSDATA 项，可附加 B 站 AI 总结功能
-# 获取方式
+# 获取方式（觉得麻烦可以看最下面的指令扫码登陆）
 # B站网页打开开发者工具，切换到网络标签页，刷新后点击一个类型为`fetch`的网络请求复制请求头中 Cookie 的全部内容
 # 若希望cookie会自动刷新,请进入控制台，输入 window.localStorage.ac_time_value 并执行即可获取其值。
 # 然后按照如下格式填写，xxxx为你的 Cookie 内容, abc 为 ac_time_value 的值
