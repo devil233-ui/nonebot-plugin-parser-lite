@@ -67,5 +67,5 @@ class HupuParser(BaseParser):
             stats=bbs.stats,
             title=bbs.title,
             timestamp=bbs.timestamp,
-            url=f"https://m.hupu.com/bbs/{bbs.tid}",
+            url=f"https://m.hupu.com/bbs/{bbs.tid}.html",
         )
