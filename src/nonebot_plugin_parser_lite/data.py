@@ -321,7 +321,7 @@ class ParseResult:
             f"author: {self.author}, "
             f"content: {self.content}, "
             f"stats: {self.stats}, "
-            f"comments: {self.comments}, "
+            f"comments_len: {len(self.comments)}, "
             f"extra: {self.extra}, "
             f"repost: {self.repost}, "
             f"render_image: {self.render_image.name if self.render_image else 'None'}"
