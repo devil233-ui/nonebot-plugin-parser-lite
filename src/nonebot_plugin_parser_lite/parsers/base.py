@@ -327,7 +327,7 @@ class BaseParser:
         response = await DOWNLOADER.head(
             url, ext_headers=headers, use_curl_cffi=use_curl_cffi
         )
-        return str(response.url)
+        return response.url
 
     def create_author(
         self,

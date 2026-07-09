@@ -5,15 +5,37 @@ from contextlib import asynccontextmanager
 from typing import Any, Literal
 
 from curl_cffi import AsyncSession
-from httpx import AsyncClient, Headers, Request, Response, Timeout
+from curl_cffi import Response as CurlResponse
+from httpx import AsyncClient, Timeout, codes
+from httpx import Response as HttpxResponse
+
+from ..exception import ParseException
 
 
-class DownloadResponse:
+class HTTPStatusError(ParseException):
+    """HTTP 状态码异常"""
+
+    def __init__(self, message: str, response: UniResponse):
+        super().__init__(message)
+        self.response = response
+
+
+class HeadResponse:
+    __solts__ = ("status_code", "headers", "url")
+
+    def __init__(self, url: str, status_code: int, headers: dict[str, str | None]):
+        self.status_code = status_code
+        self.headers = headers
+        self.url = url
+
+
+class UniResponse:
     """Normalize the small response surface used by StreamDownloader."""
 
     __slots__ = ("_raw",)
+    raw: CurlResponse | HttpxResponse
 
-    def __init__(self, raw: Any):
+    def __init__(self, raw: CurlResponse | HttpxResponse):
         self._raw = raw
 
     @property
@@ -21,8 +43,8 @@ class DownloadResponse:
         return self._raw.status_code
 
     @property
-    def headers(self) -> Headers:
-        return Headers(self._raw.headers)
+    def headers(self) -> dict[str, str | None]:
+        return dict(self._raw.headers.items())
 
     @property
     def url(self) -> str:
@@ -36,14 +58,27 @@ class DownloadResponse:
     def content(self) -> bytes:
         return self._raw.content
 
-    def json(self) -> Any:
-        return self._raw.json()
-
-    def raise_for_status(self) -> None:
-        self._raw.raise_for_status()
+    def raise_for_status(self):
+        if self.status_code >= 400 or self.status_code < 200:
+            status_class = self.status_code // 100
+            error_types = {
+                1: "Informational response",
+                3: "Redirect response",
+                4: "Client error",
+                5: "Server error",
+            }
+            error_type = error_types.get(status_class, "Invalid status code")
+            reason_phrase = codes.get_reason_phrase(self.status_code)
+            message = (
+                f"{error_type} '{self.status_code} {reason_phrase}' "
+                f"for url '{self.url}'\n"
+                f"For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/{self.status_code}"
+            )
+            raise HTTPStatusError(message, response=self)
+        return self
 
     async def aiter_bytes(self, chunk_size: int | None = None) -> AsyncIterator[bytes]:
-        if hasattr(self._raw, "aiter_bytes"):
+        if isinstance(self._raw, HttpxResponse):
             async for chunk in self._raw.aiter_bytes(chunk_size):
                 yield chunk
             return
@@ -51,18 +86,10 @@ class DownloadResponse:
         async for chunk in self._raw.aiter_content():
             yield chunk
 
-    def to_httpx_response(self) -> Response:
-        request = getattr(self._raw, "request", None)
-        if not isinstance(request, Request):
-            request = Request("GET", self.url)
-        return Response(
-            status_code=self.status_code,
-            headers=self.headers,
-            request=request,
-        )
 
+class UniHttpClient:
+    """Adapter over httpx and curl_cffi with one request interface."""
 
-class DownloadHttpClient:
     def __init__(self, timeout: Timeout):
         self._timeout = timeout
         self._httpx = AsyncClient(timeout=timeout, verify=False)
@@ -83,7 +110,7 @@ class DownloadHttpClient:
         *,
         headers: dict[str, str],
         use_curl_cffi: bool = False,
-    ) -> DownloadResponse:
+    ) -> UniResponse:
         if use_curl_cffi:
             resp = await self._curl.head(
                 url=url,
@@ -98,7 +125,7 @@ class DownloadHttpClient:
                 headers=headers,
                 follow_redirects=True,
             )
-        return DownloadResponse(resp)
+        return UniResponse(resp)
 
     async def get(
         self,
@@ -106,7 +133,7 @@ class DownloadHttpClient:
         *,
         headers: dict[str, str],
         use_curl_cffi: bool = False,
-    ) -> DownloadResponse:
+    ) -> UniResponse:
         if use_curl_cffi:
             resp = await self._curl.get(
                 url,
@@ -121,33 +148,7 @@ class DownloadHttpClient:
                 headers=headers,
                 follow_redirects=True,
             )
-        return DownloadResponse(resp)
-
-    async def post(
-        self,
-        url: str,
-        *,
-        headers: dict[str, str],
-        use_curl_cffi: bool = False,
-        **kwargs: Any,
-    ) -> DownloadResponse:
-        if use_curl_cffi:
-            resp = await self._curl.post(
-                url,
-                headers=headers,
-                allow_redirects=True,
-                timeout=self._curl_timeout(),
-                verify=False,
-                **kwargs,
-            )
-        else:
-            resp = await self._httpx.post(
-                url,
-                headers=headers,
-                follow_redirects=True,
-                **kwargs,
-            )
-        return DownloadResponse(resp)
+        return UniResponse(resp)
 
     @asynccontextmanager
     async def stream(
@@ -160,7 +161,7 @@ class DownloadHttpClient:
         headers: dict[str, str],
         timeout: float | None = None,
         use_curl_cffi: bool = False,
-    ) -> AsyncGenerator[DownloadResponse]:
+    ) -> AsyncGenerator[UniResponse]:
         if use_curl_cffi:
             async with self._curl.stream(
                 method,
@@ -170,7 +171,7 @@ class DownloadHttpClient:
                 allow_redirects=True,
                 verify=False,
             ) as resp:
-                yield DownloadResponse(resp)
+                yield UniResponse(resp)
         else:
             kwargs: dict[str, Any] = {
                 "headers": headers,
@@ -179,4 +180,4 @@ class DownloadHttpClient:
             if timeout is not None:
                 kwargs["timeout"] = timeout
             async with self._httpx.stream(method, url, **kwargs) as resp:
-                yield DownloadResponse(resp)
+                yield UniResponse(resp)
