@@ -58,6 +58,8 @@ class Config(BaseModel):
     """最大评论数量"""
     plite_forward_text_threshold: int = 1000
     """纯文本文本长度阈值，超过此长度的文本将会强制转发(最大4500)"""
+    plite_max_retries: int = 3
+    """最大下载重试次数"""
 
     @property
     def nickname(self) -> str:
@@ -188,6 +190,11 @@ class Config(BaseModel):
     def forward_text_threshold(self) -> int:
         """纯文本文本长度阈值，超过此长度的文本将会强制转发"""
         return self.plite_forward_text_threshold
+
+    @property
+    def max_retries(self) -> int:
+        """最大下载重试次数"""
+        return self.plite_max_retries
 
 
 # 初始化配置实例

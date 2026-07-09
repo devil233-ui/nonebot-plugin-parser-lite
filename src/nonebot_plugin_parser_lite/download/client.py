@@ -30,8 +30,6 @@ class HeadResponse:
 
 
 class UniResponse:
-    """Normalize the small response surface used by StreamDownloader."""
-
     __slots__ = ("_raw",)
     raw: CurlResponse | HttpxResponse
 
@@ -44,7 +42,8 @@ class UniResponse:
 
     @property
     def headers(self) -> dict[str, str | None]:
-        return dict(self._raw.headers.items())
+        """被全部小写的 HTTP 头"""
+        return {k.lower(): v for k, v in self._raw.headers.items()}
 
     @property
     def url(self) -> str:
@@ -88,8 +87,6 @@ class UniResponse:
 
 
 class UniHttpClient:
-    """Adapter over httpx and curl_cffi with one request interface."""
-
     def __init__(self, timeout: Timeout):
         self._timeout = timeout
         self._httpx = AsyncClient(timeout=timeout, verify=False)
