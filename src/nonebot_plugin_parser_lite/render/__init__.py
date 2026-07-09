@@ -12,7 +12,7 @@ from nonebot_plugin_htmlrender import template_to_pic
 import qrcode
 
 from ..cache import CacheManager
-from ..config import _nickname, pconfig
+from ..config import _nickname, gconfig, pconfig
 from ..data import (
     AudioContent,
     GraphicContent,
@@ -40,6 +40,8 @@ MAX_FORWARD_TEXT_LEN = 30000
 """单个 forward 文本总长上限"""
 MAX_FORWARD_NODES = 90
 """单个 forward 节点数上限"""
+
+IS_DEBUG = gconfig.log_level in ["DEBUG", "TRACE", 10, 5]
 
 
 def split_text_by_length_with_punct(text: str, max_len: int) -> list[str]:
@@ -425,29 +427,27 @@ class Renderer:
             if platform_name in music_platforms:
                 template_name = "music.html.jinja"
             else:
-                # 其他平台使用各自的模板
                 file_name = f"{platform_name}.html.jinja"
                 if await (self.templates_dir / file_name).exists():
                     template_name = file_name
 
-        # from jinja2 import FileSystemLoader, Environment
+        if IS_DEBUG:
+            from jinja2 import Environment, FileSystemLoader
 
-        # # 创建一个包加载器对象
-        # env = Environment(
-        #     loader=FileSystemLoader(self.templates_dir),
-        #     enable_async=True,
-        # )
-        # env.filters["safe_src"] = safe_src
-        # template = env.get_template(template_name)
-        # # 渲染
-        # with open(
-        #     f"{self.templates_dir.parent.parent}/{datetime.datetime.now().strftime('%Y-%m-%d-%H%M%S')}.html",  # noqa: E501
-        #     "w",
-        #     encoding="utf8",
-        # ) as f:
-        #     f.write(
-        #         await template.render_async(result=template_data)
-        #     )
+            env = Environment(
+                loader=FileSystemLoader(self.templates_dir),
+                enable_async=True,
+            )
+            env.filters["safe_src"] = safe_src
+            template = env.get_template(template_name)
+            render_path = (
+                self.templates_dir.parent.parent
+                / f"{datetime.datetime.now().strftime('%Y-%m-%d-%H%M%S')}.html"
+            )
+            await render_path.write_text(
+                await template.render_async(result=template_data), encoding="utf8"
+            )
+            logger.info(f"已生成调试 HTML: {render_path}")
 
         return await template_to_pic(
             template_path=str(self.templates_dir),
