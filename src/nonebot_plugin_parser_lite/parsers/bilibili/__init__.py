@@ -966,7 +966,7 @@ class BilibiliParser(BaseParser):
         video_stream = streams[0]
         if video_stream is None:
             async with aiofiles.open(
-                f"{bvid}_{avid}_not_found_.json", "w", encoding="utf-8"
+                f"{video.__bvid}_{video.__aid}_not_found_.json", "w", encoding="utf-8"
             ) as f:
                 await f.write(ujson.dumps(download_url_data))
             raise DownloadException(
