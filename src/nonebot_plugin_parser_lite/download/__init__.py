@@ -19,10 +19,10 @@ from rich.progress import (
     TransferSpeedColumn,
 )
 
-from ..utils.cache import CacheManager
 from ..config import pconfig
 from ..constants import COMMON_HEADER, DOWNLOAD_TIMEOUT
 from ..exception import DownloadException, SizeLimitException, ZeroSizeException
+from ..utils.cache import CacheManager
 from ..utils.common import generate_file_name, make_filename, safe_unlink
 from ..utils.ffmpeg import FFmpeg
 from .client import RetryableDownloadError, UniHttpClient, UniResponse
@@ -205,7 +205,7 @@ class StreamDownloader:
                 await asyncio.sleep(delay)
 
         raise DownloadException(
-            f"在 {self.MAX_RETRIES} 次重试后下载失败: {last_error}"
+            f"在 {self.MAX_RETRIES} 次重试后下载失败"
         ) from last_error
 
     def __validate_response(self, response: UniResponse, downloaded: int):
