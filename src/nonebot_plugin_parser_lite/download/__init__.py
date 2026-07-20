@@ -200,7 +200,7 @@ class StreamDownloader:
                 delay = min(2**retry, 8)
                 logger.warning(
                     f"下载失败，{delay} 秒后重试 ({retry + 1}/"
-                    f"{self.MAX_RETRIES}): {last_error}"
+                    f"{self.MAX_RETRIES}): {last_error !r}"
                 )
                 await asyncio.sleep(delay)
 
