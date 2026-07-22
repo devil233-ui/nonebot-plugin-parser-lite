@@ -1,4 +1,5 @@
 import contextlib
+import random
 import time
 from typing import ClassVar
 
@@ -11,6 +12,10 @@ from .base import (
     PlatformEnum,
     handle,
 )
+
+
+def random_ip() -> str:
+    return ".".join(str(random.randint(0, 255)) for _ in range(4))
 
 
 def parse_duration_to_seconds(duration: str) -> int:
@@ -52,7 +57,7 @@ class NCMParser(BaseParser):
 
     async def fetch(self, endpoint: str, payload: dict) -> dict:
         payload["timestamp"] = int(time.time() * 1000)
-        payload["ip"] = "1.1.1.1"
+        payload["ip"] = random_ip()
         resp = await self.httpx.post(endpoint, json=payload)
         resp.raise_for_status()
         result = resp.json()
