@@ -24,7 +24,7 @@ ROUTER_PATTERN = re.compile(
     flags=re.DOTALL,
 )
 NOTE_PATTERN = re.compile(
-    pattern=r'self\.__pace_f\.push\(\[1,"7:.*?null,(.*?)</script>',
+    pattern=r'self\.__pace_f\.push\(\[1,"7:.*?null,(.*?)\]\\n"\]\)</script>',
     flags=re.DOTALL,
 )
 
