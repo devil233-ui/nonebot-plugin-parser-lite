@@ -201,6 +201,14 @@ plite_max_comments=5
 # [可选] 纯文本文本长度阈值，超过此长度的文本将会强制转发
 plite_forward_text_threshold=1000
 
+# [可选] 图文混合内容触发合并转发的节点数阈值
+plite_forward_node_threshold=4
+
+# [可选] 长文本阈值，以及长文本/普通内容每批转发的节点数
+plite_forward_long_text_threshold=1500
+plite_forward_small_batch_size=4
+plite_forward_large_batch_size=99
+
 # [可选] 最大下载重试次数
 plite_max_retries=3
 
@@ -214,6 +222,9 @@ plite_zhihu_ck="z_c0=xxxx"
 
 # [可选] linuxdo cookie, 部分帖子需要登录或有一定的阅读等级才可以查看
 plite_linuxdo_ck="xxxx"
+
+# [可选] 自建网易云 API；配置后优先使用，失败时回退上游接口
+plite_netease_local_api="http://127.0.0.1:4000"
 ```
 
 </details>

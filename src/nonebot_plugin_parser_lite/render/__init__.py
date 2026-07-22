@@ -1,3 +1,4 @@
+import asyncio
 import base64
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from dataclasses import dataclass, field
@@ -248,49 +249,74 @@ class Renderer:
     async def send_content(
         self, result: ParseResult
     ) -> AsyncGenerator[UniMessage[Any], None]:
-        """发送媒体内容消息。
-
-        将解析结果中的媒体内容拆分为：
-        - 需要立即发送的音视频（逐条 yield）
-        - 可合并转发的图文 / 图片（统一收集后一次发送）
-        """
+        """并发构建媒体与图文消息，按完成顺序发送。"""
         failed_count = 0
         repost_medias = result.repost.content if result.repost else []
-        media_contents = (
+        media_contents = [
             cont
             for cont in chain(result.content, repost_medias)
             if isinstance(cont, MediaContent) and cont.need_send
-        )
-        for cont in media_contents:
-            # 先处理需要立即发送的音视频
+        ]
+
+        async def build_media_messages(
+            cont: MediaContent,
+        ) -> tuple[Literal["media", "forward"], list[UniMessage[Any]], int]:
+            messages: list[UniMessage[Any]] = []
+            failed = 0
             try:
                 async for msg in self.__handle_immediate_media(cont):
-                    yield msg
-            except SizeLimitException:
-                yield UniMessage(
-                    f"媒体太大啦，还是去{result.platform.display_name}看看吧~"
+                    messages.append(msg)
+            except SizeLimitException as e:
+                messages.append(
+                    UniMessage(
+                        f"设定的最大上传大小为 {pconfig.max_size}MB\n"
+                        f"当前解析到的媒体大小为 {e.size}MB\n"
+                        "媒体太大了~"
+                    )
                 )
-                continue
-            except DurationLimitException:
-                yield UniMessage(
-                    f"媒体太长啦，还是去{result.platform.display_name}看看吧~"
+            except DurationLimitException as e:
+                messages.append(
+                    UniMessage(
+                        f"设定的最大时长为 {pconfig.duration_maximum}s\n"
+                        f"当前解析到的媒体时长为 {e.duration}s\n"
+                        "媒体太长了~"
+                    )
                 )
-                continue
             except DownloadException as e:
-                failed_count += 1
                 logger.exception(f"{cont.__class__.__name__} 下载失败: {e!r}")
-                continue
+                failed = 1
+            except Exception as e:
+                logger.exception(
+                    f"{cont.__class__.__name__} 下载过程中发生未预期异常: {e!r}"
+                )
+                failed = 1
+            return "media", messages, failed
 
-        # 2 构建图文 / 图片的转发列表（含主帖 + 转发，按顺序）
-        ordered_segs = await self.__build_forward_segs(result)
-        if ordered_segs:
-            # 一次遍历：统计+长文本拆分
+        tasks: list[
+            asyncio.Task[
+                tuple[
+                    Literal["media", "forward"],
+                    list[UniMessage[Any]],
+                    int,
+                ]
+            ]
+        ] = [asyncio.create_task(build_media_messages(cont)) for cont in media_contents]
+
+        async def build_forward_messages(
+            res: ParseResult,
+        ) -> tuple[Literal["media", "forward"], list[UniMessage[Any]], int]:
+            messages: list[UniMessage[Any]] = []
+            ordered_segs = await self.__build_forward_segs(res)
+            if not ordered_segs:
+                return "forward", messages, 0
+
+            is_pure_text = all(
+                isinstance(seg, (_ForwardText, str)) for seg in ordered_segs
+            )
             processed_segs: list[ForwardNodeInner] = []
             total_plain_len = 0
-            node_count = 0
 
             for seg in ordered_segs:
-                node_count += 1
                 if isinstance(seg, _ForwardText):
                     total_plain_len += seg.text_length
                     processed_segs.extend(seg.split(SPLIT_THRESHOLD))
@@ -306,52 +332,74 @@ class Renderer:
                 else:
                     processed_segs.append(seg)
 
-            # 是否需要合并转发：
-            # 1) 配置项 need_forward_contents
-            # 2) 纯文字部分超过阈值
-            # 3) 节点数较多
-            need_forward = (
-                pconfig.need_forward_contents
-                or total_plain_len > SPLIT_THRESHOLD
-                or node_count > 4
+            need_forward = total_plain_len > pconfig.forward_text_threshold or (
+                not is_pure_text
+                and (
+                    pconfig.need_forward_contents
+                    or len(ordered_segs) > pconfig.forward_node_threshold
+                )
             )
-
             if not need_forward:
-                # 不走合并转发：直接按节点顺序发出
-                yield UniMessage(processed_segs)
-            else:
-                # 需要合并转发：根据平台限制按文本长度 / 节点数分批构造 forward
-                current_chunk: list[ForwardNodeInner] = []
+                if is_pure_text:
+                    text = "\n".join(
+                        seg for seg in processed_segs if isinstance(seg, str)
+                    )
+                    messages.append(UniMessage(text))
+                else:
+                    messages.append(UniMessage(processed_segs))
+                return "forward", messages, 0
+
+            configured_node_limit = (
+                pconfig.forward_small_batch_size
+                if total_plain_len > pconfig.forward_long_text_threshold
+                else pconfig.forward_large_batch_size
+            )
+            node_limit = min(max(configured_node_limit, 1), MAX_FORWARD_NODES)
+            current_chunk: list[ForwardNodeInner] = []
+            current_text_len = 0
+
+            def flush_chunk() -> None:
+                nonlocal current_text_len
+                if not current_chunk:
+                    return
+                messages.append(
+                    UniMessage(UniHelper.construct_forward_message(current_chunk))
+                )
+                current_chunk.clear()
                 current_text_len = 0
 
-                def flush_chunk() -> UniMessage[Any] | None:
-                    nonlocal current_text_len
-                    if not current_chunk:
-                        return None
-                    msg = UniMessage(UniHelper.construct_forward_message(current_chunk))
-                    current_chunk.clear()
-                    current_text_len = 0
-                    return msg
+            for seg in processed_segs:
+                seg_text_len = len(seg) if isinstance(seg, str) else 0
+                if current_chunk and (
+                    current_text_len + seg_text_len > MAX_FORWARD_TEXT_LEN
+                    or len(current_chunk) >= node_limit
+                ):
+                    flush_chunk()
+                current_chunk.append(seg)
+                current_text_len += seg_text_len
+            flush_chunk()
+            return "forward", messages, 0
 
-                for seg in processed_segs:
-                    seg_text_len = len(seg) if isinstance(seg, str) else 0
+        tasks.append(asyncio.create_task(build_forward_messages(result)))
 
-                    # 如果加上当前节点会超出单个 forward 限制，则先 flush 当前 chunk
-                    if current_chunk and (
-                        current_text_len + seg_text_len > MAX_FORWARD_TEXT_LEN
-                        or len(current_chunk) >= MAX_FORWARD_NODES
+        try:
+            for completed in asyncio.as_completed(tasks):
+                task_type, messages, failed = await completed
+                failed_count += failed
+                for index, message in enumerate(messages):
+                    yield message
+                    if (
+                        task_type == "forward"
+                        and len(messages) > 1
+                        and index < len(messages) - 1
                     ):
-                        msg = flush_chunk()
-                        if msg is not None:
-                            yield msg
-
-                    current_chunk.append(seg)
-                    current_text_len += seg_text_len
-
-                # 收尾：还有未发送的 chunk
-                last_msg = flush_chunk()
-                if last_msg is not None:
-                    yield last_msg
+                        await asyncio.sleep(1.0)
+        finally:
+            pending = [task for task in tasks if not task.done()]
+            for task in pending:
+                task.cancel()
+            if pending:
+                await asyncio.gather(*pending, return_exceptions=True)
 
         # 汇总下载失败信息
         if failed_count > 0:
@@ -414,6 +462,11 @@ class Renderer:
             if title := pr.title:
                 nodes.append(
                     _ForwardText(author_name, [_ForwardTextPart(title)], False)
+                )
+
+            if pr.title:
+                text_buffer.append(
+                    _ForwardTextPart(f"【{pr.title}】\n", protected=True)
                 )
 
             async def flush_text() -> None:
@@ -601,7 +654,6 @@ class Renderer:
 
     async def resolve_parse_result(self, result: ParseResult) -> dict[str, Any]:
         """解析 ParseResult 为模板可用的字典数据"""
-
         data: dict[str, Any] = {
             "title": result.title,
             "formatted_datetime": result.formatted_datetime,

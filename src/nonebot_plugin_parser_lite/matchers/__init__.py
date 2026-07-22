@@ -20,6 +20,7 @@ from nonebot_plugin_uninfo import Uninfo
 from tarina import LRU
 
 from ..config import pconfig
+from ..data import MediaContent
 from ..download import DOWNLOADER
 from ..helper import UniHelper
 from ..parsers.base import BaseParser, ParseResult
@@ -140,8 +141,24 @@ async def parser_handler(
         logger.debug(f"命中缓存: {cache_key}, 结果: {result!r}")
 
     summary_msg = await RENDERER.render_messages(result)
-    await summary_msg.send()
-    if pconfig.lazy_download:
+
+    # 部分协议端会在消息实际发出后仍报告超时，继续处理后续内容。
+    try:
+        await summary_msg.send()
+    except Exception as e:
+        logger.warning(
+            f"发送摘要消息时抛出异常 (视为超时假报错，将继续处理后续内容): {e}"
+        )
+
+    contents = list(result.content)
+    if result.repost:
+        contents.extend(result.repost.content)
+    has_media = any(
+        isinstance(content, MediaContent) and content.need_send for content in contents
+    )
+
+    # 纯文字仍需进入 send_content；仅有待发送媒体时启用懒下载。
+    if has_media and pconfig.lazy_download:
         if pconfig.lazy_download_tip:
             download_cmd = ", ".join(pconfig.download_command)
             await UniMessage(
