@@ -20,6 +20,7 @@ from nonebot_plugin_uninfo import Uninfo
 from tarina import LRU
 
 from ..config import pconfig
+from ..data import MediaContent
 from ..download import DOWNLOADER
 from ..helper import UniHelper
 from ..parsers import BilibiliParser
@@ -149,8 +150,21 @@ async def parser_handler(
         logger.debug(f"命中缓存: {cache_key}, 结果: {result!r}")
 
     summary_msg = await RENDERER.render_messages(result)
-    await summary_msg.send()
-    if pconfig.lazy_download:
+
+    # ✨ 修复 1：加上 try...except 兜底，无视超时假报错
+    try:
+        await summary_msg.send()
+    except Exception as e:
+        logger.warning(f"发送摘要消息时抛出异常 (视为超时假报错，将继续处理后续内容): {e}")
+
+    contents = list(result.content)
+    if result.repost:
+        contents.extend(result.repost.content)
+    has_media = any(isinstance(c, MediaContent) and c.need_send for c in contents)
+    
+    # ✨ 修复 2：废除一刀切的 return，让纯文字也能顺利流转到底部的 RENDERER.send_content
+    # 只有在确确实实有媒体（音视频），且开启了懒加载的情况下，才在这里挂起并拦截
+    if has_media and pconfig.lazy_download:
         if pconfig.lazy_download_tip:
             download_cmd = ", ".join(pconfig.download_command)
             await UniMessage(
@@ -161,7 +175,6 @@ async def parser_handler(
     else:
         async for content_msg in RENDERER.send_content(result):
             await content_msg.send()
-
 
 @driver.on_startup
 async def register_bili_matcher():

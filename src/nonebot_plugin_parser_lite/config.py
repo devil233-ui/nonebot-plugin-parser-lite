@@ -56,6 +56,16 @@ class Config(BaseModel):
     plite_bili_video_quality: BiliVideoQuality = BiliVideoQuality._1080P
     """B站视频清晰度"""
     plite_need_forward_contents: bool = True
+    """触发合并转发的纯文字总字数阈值"""
+    plite_forward_text_threshold: int = 500
+    """触发合并转发的图文混合节点数阈值"""
+    plite_forward_node_threshold: int = 4
+    """判断为超长文本的字数阈值（图为主还是字为主？用于动态调整单次装箱量（用于缩减单次装箱量）"""
+    plite_forward_long_text_threshold: int = 1500
+    """超长文本情况下（即字为主）的单次转发节点装箱量"""
+    plite_forward_small_batch_size: int = 4
+    """普通情况下（即图为主）的单次转发节点装箱量"""
+    plite_forward_large_batch_size: int = 99
     """是否需要合并转发内容(大于四项时始终转发)"""
     plite_lazy_download: bool = False
     """是否开启懒下载模式，仅在用户请求时才下载视频"""
@@ -79,6 +89,8 @@ class Config(BaseModel):
     """最大下载重试次数"""
     plite_day_range: list[str] = ["6:00", "19:00"]
     """白天时间范围 [开始, 结束]，格式 h:m；范围内为浅色主题，范围外为夜间模式"""
+    plite_netease_local_api: str | None = None
+    """网易云本地 API 地址；配置后优先使用，失败时回退上游接口"""
 
     @property
     def nickname(self) -> str:
@@ -223,6 +235,25 @@ class Config(BaseModel):
             parse_hm_to_minutes(self.plite_day_range[1]),
         )
 
+    @property
+    def forward_node_threshold(self) -> int:
+        """触发合并转发的图文混合节点数阈值"""
+        return self.plite_forward_node_threshold
+
+    @property
+    def forward_long_text_threshold(self) -> int:
+        """判断为超长文本的字数阈值（图为主还是字为主？用于动态调整单次装箱量"""
+        return self.plite_forward_long_text_threshold
+
+    @property
+    def forward_small_batch_size(self) -> int:
+        """超长文本情况下（即字为主）的单次转发节点装箱量"""
+        return self.plite_forward_small_batch_size
+
+    @property
+    def forward_large_batch_size(self) -> int:
+        """普通情况下（即图为主）的单次转发节点装箱量"""
+        return self.plite_forward_large_batch_size
 
 # 初始化配置实例
 _driver = get_driver()

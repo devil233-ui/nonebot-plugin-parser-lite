@@ -189,9 +189,21 @@ plite_forward_text_threshold=1000
 # [可选] 最大下载重试次数
 plite_max_retries=3
 
+<<<<<<< HEAD
 # [可选] 白天时间范围 [开始, 结束]，格式 h:m；范围内为浅色主题，范围外为夜间模式
 # 支持跨午夜范围，例如 ["22:30", "6:00"]
 plite_day_range=["6:00", "19:00"]
+=======
+# [可选] 网易云本地 API 地址；配置后优先使用，失败时自动回退上游接口
+plite_netease_local_api=http://127.0.0.1:4000
+
+# 下面的设置用于主题颜色的自动切换
+# [可选] 白天开始时间(h)
+plite_day_start_hour=6
+
+# [可选] 夜间开始时间(h)
+plite_night_start_hour=19
+>>>>>>> c54b28a (✨ 进行多项优化)
 ```
 
 </details>
