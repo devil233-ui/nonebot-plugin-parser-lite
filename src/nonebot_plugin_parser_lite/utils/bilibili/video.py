@@ -96,8 +96,8 @@ class Video:
 
     def __init__(
         self,
-        bvid: None | str = None,
-        aid: None | int = None,
+        bvid: str | None = None,
+        aid: int | None = None,
         credential: Credential | None = None,
     ):
         """
