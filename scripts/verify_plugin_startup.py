@@ -8,7 +8,7 @@ PLUGIN_NAME = "nonebot_plugin_parser_lite"
 
 
 async def verify() -> None:
-    nonebot.init()
+    nonebot.init(log_level="DEBUG")
     driver = nonebot.get_driver()
     if nonebot.load_plugin(PLUGIN_NAME) is None:
         raise RuntimeError(f"Failed to load {PLUGIN_NAME}")
