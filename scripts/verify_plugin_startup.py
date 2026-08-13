@@ -29,7 +29,7 @@ async def verify() -> dict[str, Any]:
 
     try:
         stage_started_at = perf_counter()
-        nonebot.init()
+        nonebot.init(log_level="DEBUG")
         driver = nonebot.get_driver()
         timings["nonebot_init_ms"] = elapsed_ms(stage_started_at)
 
