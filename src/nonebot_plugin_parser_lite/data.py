@@ -205,7 +205,7 @@ class Platform:
 class Author:
     """作者信息"""
 
-    name: PlatformEnum
+    name: str
     """作者名称"""
     id: str | None = None
     """作者id"""
