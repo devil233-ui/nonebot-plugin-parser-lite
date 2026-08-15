@@ -104,7 +104,7 @@ class IlluParser(BaseParser):
         objectId: str,
         type: BizType,
     ) -> ArticleByIdV2 | DrawingDetail:
-        """根据 objectId 和类型拉取 ILLU 详情数据。"""
+        """根据 objectId 和类型拉取 ILLU 详情数据"""
         if type is BizType.Article:
             router = Detail.ArticleDetail.value
             payload = {"articleId": objectId}

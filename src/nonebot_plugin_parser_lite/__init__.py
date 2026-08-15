@@ -34,7 +34,7 @@ __plugin_meta__ = PluginMetadata(
 
 @scheduler.scheduled_job("interval", hours=2, id="parser-clean-local-cache")
 async def clean_plugin_cache() -> None:
-    """周期性清理过期缓存文件，并重置解析状态。"""
+    """周期性清理过期缓存文件，并重置解析状态"""
 
     try:
         await CacheManager.clean_expired()

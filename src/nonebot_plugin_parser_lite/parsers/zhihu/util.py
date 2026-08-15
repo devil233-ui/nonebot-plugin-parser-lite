@@ -9,7 +9,7 @@ VIDEO_HEADER = {**DOWNLOADER.headers, "x-app-za": "OS=webplayer", "x-referer": "
 
 
 def _quality_rank(q: str) -> int:
-    """把 'FHD'/'HD'/'SD' 映射到数值，越大越好。"""
+    """把 'FHD'/'HD'/'SD' 映射到数值，越大越好"""
     q = q.upper()
     if q == "FHD":
         return 3
@@ -81,7 +81,7 @@ async def parse_rich_content(html: str, content_type: str) -> list[ContentItem]:
 
 
 def _clean_soup(soup: BeautifulSoup) -> None:
-    """预清洗 DOM：移除 noscript 等无效节点。"""
+    """预清洗 DOM：移除 noscript 等无效节点"""
     for noscript in soup.find_all("noscript"):
         noscript.decompose()
 

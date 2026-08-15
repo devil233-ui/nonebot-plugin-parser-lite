@@ -45,7 +45,7 @@ _URL_PATTERN = re.compile(r"https?://[^\s]+", re.IGNORECASE)
 
 
 def _ensure_parser_instance(parser_cls: type[BaseParser]) -> BaseParser:
-    """按需实例化 parser，并缓存结果。"""
+    """按需实例化 parser，并缓存结果"""
     parser = _PARSER_INSTANCES.get(parser_cls)
     if parser is not None:
         return parser
@@ -57,7 +57,7 @@ def _ensure_parser_instance(parser_cls: type[BaseParser]) -> BaseParser:
 
 
 def get_parser(keyword: str) -> BaseParser:
-    """根据注册的关键字获取解析器实例（惰性加载）。"""
+    """根据注册的关键字获取解析器实例（惰性加载）"""
     parser_cls = _KEYWORD_CLASS_MAP.get(keyword)
     if parser_cls is None:
         raise KeyError(f"未找到关键字 {keyword!r} 对应的 parser")
@@ -65,7 +65,7 @@ def get_parser(keyword: str) -> BaseParser:
 
 
 def get_parser_by_type(parser_type: type[T]) -> T:
-    """根据解析器类型获取解析器实例（惰性加载）。"""
+    """根据解析器类型获取解析器实例（惰性加载）"""
     # 已经有实例的情况下，直接从实例表中找
     for cls, inst in _PARSER_INSTANCES.items():
         if issubclass(cls, parser_type):
@@ -88,7 +88,7 @@ driver = get_driver()
 
 @driver.on_startup
 def register_parser_matcher() -> None:
-    """在启动时注册各平台解析器及其匹配规则（惰性实例化）。"""
+    """在启动时注册各平台解析器及其匹配规则（惰性实例化）"""
     from ..parsers import load_enabled_parsers
 
     global _ENABLED_PARSER_CLASSES, _KEYWORD_CLASS_MAP
@@ -229,7 +229,7 @@ if pconfig.lazy_download:
     @lazy_matcher.handle()
     @UniHelper.with_reaction
     async def _(session: Uninfo):
-        """懒下载命令：发送上次解析结果中的媒体内容。"""
+        """懒下载命令：发送上次解析结果中的媒体内容"""
         user_id = session.user.id
         result = await LazyManager.claim(user_id)
         if result is None:
@@ -244,7 +244,7 @@ if pconfig.lazy_download:
 
 
 class LazyManager:
-    """管理每个用户的懒下载会话，支持超时自动清理。"""
+    """管理每个用户的懒下载会话，支持超时自动清理"""
 
     TIMEOUT_SECONDS: ClassVar[int] = pconfig.lazy_download_timeout
 
@@ -260,7 +260,7 @@ class LazyManager:
 
     @classmethod
     async def add(cls, user_id: str, parse_result: ParseResult) -> None:
-        """为用户创建/刷新懒下载会话。"""
+        """为用户创建/刷新懒下载会话"""
         session = cls.Session(result=parse_result)
         async with cls.LOCK:
             cls.SESSIONS[user_id] = session
@@ -289,13 +289,13 @@ class LazyManager:
 
     @classmethod
     async def release(cls, user_id: str) -> None:
-        """标记该用户的下载发送流程结束。"""
+        """标记该用户的下载发送流程结束"""
         async with cls.LOCK:
             cls.ACTIVE_USERS.discard(user_id)
 
     @classmethod
     async def _timeout_handler(cls, user_id: str, session: Session) -> None:
-        """会话超时自动清理。"""
+        """会话超时自动清理"""
         await asyncio.sleep(cls.TIMEOUT_SECONDS)
         async with cls.LOCK:
             if cls.SESSIONS.get(user_id) is session:

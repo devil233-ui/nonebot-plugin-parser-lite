@@ -172,13 +172,13 @@ class Video:
         :return: _description_
         """
         if page_index < 0:
-            raise BiliHelperException("分 p 号必须大于或等于 0。")
+            raise BiliHelperException("分 p 号必须大于或等于 0")
 
         info = await self.get_info()
         pages = info["pages"]
 
         if len(pages) <= page_index:
-            raise BiliHelperException("不存在该分 p。")
+            raise BiliHelperException("不存在该分 p")
 
         page = pages[page_index]
         return page["cid"]
@@ -204,7 +204,7 @@ class Video:
         """  # noqa: E501
         if cid is None:
             if page_index is None:
-                raise BiliHelperException("page_index 和 cid 至少提供一个。")
+                raise BiliHelperException("page_index 和 cid 至少提供一个")
 
             cid = await self.get_cid(page_index)
 
@@ -256,7 +256,7 @@ class Video:
         """
         if cid is None:
             if page_index is None:
-                raise BiliHelperException("page_index 和 cid 至少提供一个。")
+                raise BiliHelperException("page_index 和 cid 至少提供一个")
 
             cid = await self.get_cid(page_index)
 

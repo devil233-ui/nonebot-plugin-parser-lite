@@ -14,14 +14,14 @@ from .common import safe_unlink
 
 @dataclass(frozen=True, slots=True)
 class CachePolicy:
-    """缓存目录策略。ttl_seconds 为 None 时默认不清理。"""
+    """缓存目录策略。ttl_seconds 为 None 时默认不清理"""
 
     subdir: str
     ttl_seconds: int
 
 
 class CacheManager:
-    """集中管理插件缓存目录与清理策略。"""
+    """集中管理插件缓存目录与清理策略"""
 
     MEDIA = "media"
     RENDER = "render"
@@ -34,6 +34,7 @@ class CacheManager:
         LOGO: CachePolicy("logo", 60 * 60 * 24 * 30),
         STICKER: CachePolicy("sticker", 60 * 60 * 24 * 15),
     }
+
     @classmethod
     def cache_dir(cls, cache_type: str = MEDIA) -> Path:
         policy = cls._POLICIES.get(cache_type, cls._POLICIES[cls.MEDIA])

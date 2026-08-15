@@ -70,7 +70,7 @@ class FFmpeg:
 
     @classmethod
     async def _is_mp3_audio(cls, audio_path: Path) -> bool:
-        """检查首个音频流是否已经使用 MP3 编码。"""
+        """检查首个音频流是否已经使用 MP3 编码"""
         try:
             stdout = await cls.exec_probe(
                 [
@@ -92,7 +92,7 @@ class FFmpeg:
 
     @classmethod
     async def _probe_media(cls, media_path: Path) -> dict[str, Any]:
-        """读取合成所需的媒体时长、帧率和流信息。"""
+        """读取合成所需的媒体时长、帧率和流信息"""
         stdout = await cls.exec_probe(
             [
                 "-v",

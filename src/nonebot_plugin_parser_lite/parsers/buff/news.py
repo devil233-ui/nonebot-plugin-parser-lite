@@ -22,7 +22,7 @@ class News(Struct):
 
     @property
     def content(self) -> list[ContentItem]:
-        """按 DOM 顺序依次产出文本 / 图片 / 视频内容列表。"""
+        """按 DOM 顺序依次产出文本 / 图片 / 视频内容列表"""
         data: list[ContentItem] = []
         soup = BeautifulSoup(self.body, "html.parser")
 

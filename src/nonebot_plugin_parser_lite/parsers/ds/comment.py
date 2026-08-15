@@ -55,7 +55,7 @@ class FeedComment(Struct):
 
     @property
     def root_id(self) -> str | None:
-        """parent 格式为 feedId.feedAuthorId.commentId。"""
+        """parent 格式为 feedId.feedAuthorId.commentId"""
         return self.parent.rsplit(".", 1)[-1] if self.parent else None
 
 
@@ -113,7 +113,7 @@ class Result(Struct):
         self,
         raw_comments: list[FeedComment],
     ) -> tuple[dict[str, Comment], dict[str, Author]]:
-        """创建评论节点及作者索引。"""
+        """创建评论节点及作者索引"""
         user_info_by_uid = self.user_info_by_uid
         nodes: dict[str, Comment] = {}
         author_by_uid: dict[str, Author] = {}
@@ -131,7 +131,7 @@ class Result(Struct):
         nodes: dict[str, Comment],
         author_by_uid: dict[str, Author],
     ) -> None:
-        """将回复压平挂到根评论，同时保留实际回复对象。"""
+        """将回复压平挂到根评论"""
         attached: set[str] = set()
         for raw in self.featuredReplies:
             root = nodes.get(raw.root_id or "")

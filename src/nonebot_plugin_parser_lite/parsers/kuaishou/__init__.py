@@ -49,7 +49,7 @@ class KuaiShouParser(BaseParser):
         )
 
     async def _fetch_photo(self, url: str) -> Photo:
-        """获取页面并提取作品数据。"""
+        """获取页面并提取作品数据"""
         real_url = await self.get_final_url(url, headers=self.ios_headers)
         real_url = real_url.replace("/fw/long-video/", "/fw/photo/")
         response = await self.httpx.get(real_url, headers=self.ios_headers)
@@ -61,7 +61,7 @@ class KuaiShouParser(BaseParser):
         return decode_init_state(matched[1])
 
     async def _fetch_comments(self, photo_id: str) -> list[Comment]:
-        """获取评论；评论接口失败不影响作品解析。"""
+        """获取评论；评论接口失败不影响作品解析"""
         try:
             response = await self.httpx.post(
                 COMMENT_API,

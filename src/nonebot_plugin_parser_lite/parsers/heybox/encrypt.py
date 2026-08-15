@@ -19,32 +19,32 @@ def get_nonce(time: int) -> str:
 
 
 def _vm(e: int) -> int:
-    """等价 JS Vm。"""
+    """等价 JS Vm"""
     return ((e << 1) & 0xFF) ^ 27 if (e & 0x80) else ((e << 1) & 0xFF)
 
 
 def _qm(e: int) -> int:
-    """等价 JS qm。"""
+    """等价 JS qm"""
     return _vm(e) ^ e
 
 
 def _mm(e: int) -> int:
-    """等价 JS $m。"""
+    """等价 JS $m"""
     return _qm(_vm(e))
 
 
 def _ym(e: int) -> int:
-    """等价 JS Ym。"""
+    """等价 JS Ym"""
     return _mm(_qm(_vm(e)))
 
 
 def _gm(e: int) -> int:
-    """等价 JS Gm。"""
+    """等价 JS Gm"""
     return _ym(e) ^ _mm(e) ^ _qm(e)
 
 
 def _km(e: list[int]) -> list[int]:
-    """等价 JS Km。"""
+    """等价 JS Km"""
     t0 = _gm(e[0]) ^ _ym(e[1]) ^ _mm(e[2]) ^ _qm(e[3])
     t1 = _qm(e[0]) ^ _gm(e[1]) ^ _ym(e[2]) ^ _mm(e[3])
     t2 = _mm(e[0]) ^ _qm(e[1]) ^ _gm(e[2]) ^ _ym(e[3])
@@ -54,7 +54,7 @@ def _km(e: list[int]) -> list[int]:
 
 
 def _av(e: str, t: str, n: int) -> str:
-    """等价 JS av(e, t, n)。"""
+    """等价 JS av(e, t, n)"""
     # JS: var i = t.slice(0, n);
     i = t[:n]
     if not i:
@@ -67,7 +67,7 @@ def _av(e: str, t: str, n: int) -> str:
 
 
 def _sv(e: str, t: str) -> str:
-    """等价 JS sv(e, t)。"""
+    """等价 JS sv(e, t)"""
     if not t:
         return ""
     res_chars: list[str] = [t[ord(ch) % len(t)] for ch in e]
@@ -134,7 +134,7 @@ def get_hkey(time: int) -> str:
 
 
 def build_url(link_id: str) -> str:
-    """构造等价的请求 URL。"""
+    """构造等价的请求 URL"""
     time = int(_time.time())
     return (
         f"https://{BASE_URL}{PATH}"

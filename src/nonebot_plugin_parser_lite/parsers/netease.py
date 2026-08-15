@@ -21,7 +21,7 @@ def random_ip() -> str:
 
 
 def parse_duration_to_seconds(duration: str) -> int:
-    """将时长字符串解析为总秒数。"""
+    """将时长字符串解析为总秒数"""
     parts = duration.split(":")
     if not (1 <= len(parts) <= 3):
         raise ValueError(f"非法的时长格式: {duration!r}")

@@ -304,12 +304,12 @@ async def _get_refresh_csrf(credential: Credential) -> str:
         cookies=cookies,
     )
     if resp.status_code == 404:
-        raise CookiesRefreshException("correspondPath 过期或错误。")
+        raise CookiesRefreshException("correspondPath 过期或错误")
     elif resp.status_code == 200:
         text = resp.text
         return re.findall('<div id="1-name">(.+?)</div>', text)[0]
     else:
-        raise CookiesRefreshException("获取刷新 Cookies 的 csrf 失败。")
+        raise CookiesRefreshException("获取刷新 Cookies 的 csrf 失败")
 
 
 async def _refresh_cookies(credential: Credential) -> Credential:

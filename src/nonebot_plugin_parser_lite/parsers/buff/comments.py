@@ -29,7 +29,7 @@ class Comment(Struct):
 
     @property
     def content(self) -> list[ContentItem]:
-        """将原始 message + pictures 转为文本 + 媒体内容列表。"""
+        """将原始 message + pictures 转为文本 + 媒体内容列表"""
         contents: list[ContentItem] = []
         text = self.message or ""
 
