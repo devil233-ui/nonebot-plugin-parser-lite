@@ -2,10 +2,12 @@ from dataclasses import dataclass
 from enum import Enum, IntEnum
 import re
 from typing import Any
+from urllib.parse import urlsplit
 
 from yarl import URL
 
 from .a2v import av2bv, bv2av
+from .cdn import choose_cdn_domain, normalize_cdn_domain
 from .client import CLIENT
 from .credential import Credential
 from .exceptions import BiliHelperException
@@ -367,6 +369,9 @@ class MP4StreamDownloadURL:
 def sanitize_stream_urls(
     video: VideoStreamDownloadURL | FLVStreamDownloadURL | MP4StreamDownloadURL | None,
     audio: AudioStreamDownloadURL | None,
+    *,
+    cdn_region: str = "zh",
+    cdn_domain: str | None = None,
 ) -> tuple[
     VideoStreamDownloadURL | FLVStreamDownloadURL | MP4StreamDownloadURL | None,
     AudioStreamDownloadURL | None,
@@ -378,66 +383,38 @@ def sanitize_stream_urls(
 
     1. 若 base_url 为 PCDN，则优先使用 backup_url 中第一个非 PCDN 链接；
     2. 若 backup_url 里也没有非 PCDN，则保留原 base_url (真倒霉)
+    3. PCDN 清洗完成后，统一替换主链接与备用链接的 CDN
 
     :param video: 视频流 URL 信息
     :param audio: 音频流 URL 信息
+    :param cdn_region: CDN 地区；在线列表不可用时仍可使用 zh、en、ja
+    :param cdn_domain: 自定义 CDN 域名，设置后优先于地区配置
     :return: (清洗后的 video, audio)
     """
+    for stream in (video, audio):
+        if stream is None:
+            continue
 
-    def _sanitize_video(
-        v: VideoStreamDownloadURL | FLVStreamDownloadURL | MP4StreamDownloadURL | None,
-    ):
-        if v is None:
-            return None
+        if is_pcdn_url(stream.url):
+            clean_backups = [url for url in stream.backup_url if not is_pcdn_url(url)]
+            if clean_backups:
+                stream.url = clean_backups[0]
+                stream.backup_url = clean_backups[1:]
 
-        base_url = v.url
-        backups = v.backup_url
+    replacement_domain = (
+        normalize_cdn_domain(cdn_domain) if cdn_domain and cdn_domain.strip() else None
+    ) or choose_cdn_domain(cdn_region)
 
-        # 如果主 URL 不是 PCDN，则优先使用它
-        if not is_pcdn_url(base_url):
-            return v
+    def _replace_host(url: str) -> str:
+        return urlsplit(url)._replace(netloc=replacement_domain).geturl()
 
-        # 主 URL 是 PCDN，尝试从 backup_url 里找干净的替换
-        clean_backups = [u for u in backups if not is_pcdn_url(u)]
-        if clean_backups:
-            new_base = clean_backups[0]
-            rest_backups = clean_backups[1:]
-            if isinstance(v, VideoStreamDownloadURL):
-                return VideoStreamDownloadURL(
-                    url=new_base,
-                    video_quality=v.video_quality,
-                    video_codecs=v.video_codecs,
-                    backup_url=rest_backups,
-                )
-            if isinstance(v, FLVStreamDownloadURL):
-                return FLVStreamDownloadURL(url=new_base, backup_url=rest_backups)
-            return MP4StreamDownloadURL(url=new_base, backup_url=rest_backups)
+    for stream in (video, audio):
+        if stream is None:
+            continue
+        stream.url = _replace_host(stream.url)
+        stream.backup_url = [_replace_host(url) for url in stream.backup_url]
 
-        return v
-
-    def _sanitize_audio(a: AudioStreamDownloadURL | None):
-        if a is None:
-            return None
-
-        base_url = a.url
-        backups = a.backup_url
-
-        if not is_pcdn_url(base_url):
-            return a
-
-        clean_backups = [u for u in backups if not is_pcdn_url(u)]
-        if clean_backups:
-            new_base = clean_backups[0]
-            rest_backups = clean_backups[1:]
-            return AudioStreamDownloadURL(
-                url=new_base,
-                audio_quality=a.audio_quality,
-                backup_url=rest_backups,
-            )
-
-        return a
-
-    return _sanitize_video(video), _sanitize_audio(audio)
+    return video, audio
 
 
 class VideoDownloadURLDataDetecter:
@@ -470,6 +447,8 @@ class VideoDownloadURLDataDetecter:
         no_dolby_audio: bool = False,
         no_hdr: bool = False,
         no_hires: bool = False,
+        cdn_region: str = "zh",
+        cdn_domain: str | None = None,
     ) -> tuple[
         VideoStreamDownloadURL | FLVStreamDownloadURL | MP4StreamDownloadURL | None,
         AudioStreamDownloadURL | None,
@@ -491,6 +470,9 @@ class VideoDownloadURLDataDetecter:
         :param no_dolby_audio: 是否禁用杜比音频流
         :param no_hdr: 是否禁用 HDR 视频流
         :param no_hires: 是否禁用 Hi-Res 音频流
+        :param cdn_region: CDN 地区
+        :param cdn_domain: 自定义 CDN 域名，设置后优先于地区配置
+
         :return: (最佳视频流, 最佳音频流)，若不存在则对应位置为 `None`
         """  # noqa: E501
         if video_accepted_qualities is None:
@@ -519,8 +501,12 @@ class VideoDownloadURLDataDetecter:
                     backup_url=backup_url,
                 )
 
-            video_stream, _ = sanitize_stream_urls(video_stream, None)
-            return video_stream, None
+            return sanitize_stream_urls(
+                video_stream,
+                None,
+                cdn_region=cdn_region,
+                cdn_domain=cdn_domain,
+            )
 
         # DASH 正常情况
         videos_data = self.__data["dash"]["video"]
@@ -645,6 +631,9 @@ class VideoDownloadURLDataDetecter:
         best_video = max(video_streams, key=video_score) if video_streams else None
         best_audio = max(audio_streams, key=audio_score) if audio_streams else None
 
-        # 清洗 PCDN URL，尽量替换为正规 CDN
-        best_video, best_audio = sanitize_stream_urls(best_video, best_audio)
-        return best_video, best_audio
+        return sanitize_stream_urls(
+            best_video,
+            best_audio,
+            cdn_region=cdn_region,
+            cdn_domain=cdn_domain,
+        )
