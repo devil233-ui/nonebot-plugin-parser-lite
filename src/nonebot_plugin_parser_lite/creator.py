@@ -173,9 +173,8 @@ class Creator:
         :param use_curl_cffi: 是否使用 curl_cffi 下载
         """
 
-        if cache_keys is None:
-            cache_keys = [None] * len(video_urls)
-        if len(cache_keys) != len(video_urls):
+        _cache_keys = cache_keys or [None] * len(video_urls)
+        if len(_cache_keys) != len(video_urls):
             raise ValueError("cache_keys 与 video_urls 长度必须一致")
         return [
             Creator.video(
@@ -184,7 +183,7 @@ class Creator:
                 use_curl_cffi=use_curl_cffi,
                 cache_key=cache_key,
             )
-            for url, cache_key in zip(video_urls, cache_keys, strict=True)
+            for url, cache_key in zip(video_urls, _cache_keys, strict=True)
         ]
 
     @staticmethod
@@ -230,9 +229,8 @@ class Creator:
         :param use_curl_cffi: 是否使用 curl_cffi 下载
         """
 
-        if cache_keys is None:
-            cache_keys = [None] * len(image_urls)
-        if len(cache_keys) != len(image_urls):
+        _cache_keys = cache_keys or [None] * len(image_urls)
+        if len(_cache_keys) != len(image_urls):
             raise ValueError("cache_keys 与 image_urls 长度必须一致")
         return [
             Creator.image(
@@ -241,7 +239,7 @@ class Creator:
                 use_curl_cffi=use_curl_cffi,
                 cache_key=cache_key,
             )
-            for url, cache_key in zip(image_urls, cache_keys, strict=True)
+            for url, cache_key in zip(image_urls, _cache_keys, strict=True)
         ]
 
     @staticmethod
