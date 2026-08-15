@@ -5,12 +5,12 @@ from typing import Final
 
 from anyio import Path
 from nonebot import logger
-import nonebot_plugin_localstore as store
 
+from ...path import data_dir
 from .client import CLIENT
 
 CDN_DATA_URL: Final[str] = "https://kanda-akihito-kun.github.io/ccb/api/cdn.json"
-CDN_DATA_PATH: Final[Path] = Path(store.get_plugin_data_dir()) / "bilibili_cdn.json"
+CDN_DATA_PATH: Final[Path] = data_dir / "bilibili_cdn.json"
 
 # 在线列表不可用时仍可使用的稳定官方镜像。
 DEFAULT_CDN_DOMAINS: Final[dict[str, tuple[str, ...]]] = {

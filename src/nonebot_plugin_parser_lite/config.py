@@ -1,9 +1,11 @@
 from anyio import Path
 from nonebot import get_driver, get_plugin_config
-import nonebot_plugin_localstore as _store
 from pydantic import BaseModel
 
 from .constants import PlatformEnum
+from .path import cache_dir as _cache_dir
+from .path import config_dir as _config_dir
+from .path import data_dir as _data_dir
 from .utils.bilibili.video import BiliVideoCodecs, BiliVideoQuality
 
 
@@ -247,9 +249,6 @@ class Config(BaseModel):
 
 # 初始化配置实例
 _driver = get_driver()
-_cache_dir: Path = Path(_store.get_plugin_cache_dir())
-_config_dir: Path = Path(_store.get_plugin_config_dir())
-_data_dir: Path = Path(_store.get_plugin_data_dir())
 pconfig: Config = get_plugin_config(Config)
 """插件配置"""
 gconfig = _driver.config

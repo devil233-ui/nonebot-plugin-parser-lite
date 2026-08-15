@@ -57,12 +57,10 @@ def rewrite_config(root: Path) -> None:
     text = path.read_text(encoding="utf-8")
     old_header = """from anyio import Path
 from nonebot import get_driver, get_plugin_config
-import nonebot_plugin_localstore as _store
 from pydantic import BaseModel
 """
     new_header = """import json
 import os
-from pathlib import Path as SyncPath
 from typing import Any
 
 from anyio import Path
@@ -221,6 +219,7 @@ def generate(root: Path) -> None:
 
     replacements = {
         "package_init.py.tmpl": PACKAGE / "__init__.py",
+        "path.py.tmpl": PACKAGE / "path.py",
         "pipeline.py.tmpl": PACKAGE / "pipeline.py",
         "parsers_init.py.tmpl": PACKAGE / "parsers/__init__.py",
         "log.py.tmpl": PACKAGE / "utils/log.py",

@@ -16,12 +16,6 @@ def _config_from_env() -> Config:
     return Config.model_validate(values)
 
 
-_base_dir = SyncPath(
-    os.getenv("PARSER_LITE_BASE_DIR", SyncPath.cwd() / ".parser-lite")
-).resolve()
-_cache_dir = Path(_base_dir / "cache")
-_config_dir = Path(_base_dir / "config")
-_data_dir = Path(_base_dir / "data")
 pconfig: Config = _config_from_env()
 """Active standalone configuration."""
 
