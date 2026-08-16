@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="{{ theme }}">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>YouTube Media Card</title>
+        <style>
+            :root {
+                --primary: #ff0000;
+                --primary-soft: rgba(255, 0, 0, 0.12);
+                --page: #f0f1f4;
+                --card: #ffffff;
+                --panel: #f6f7f9;
+                --ink: #191a1d;
+                --ink-soft: #565960;
+                --ink-faint: #8c9098;
+                --hair: rgba(0, 0, 0, 0.08);
+                --image-border: rgba(255, 255, 255, 0.9);
+                --shadow: rgba(0, 0, 0, 0.18);
+                --radius-card: 22px;
+                --radius-panel: 14px;
+                --radius-image: 16px;
+                --font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+            }
+
+            [data-theme="dark"] {
+                --page: #0f0f0f;
+                --card: #212121;
+                --panel: #2b2b2b;
+                --ink: #f1f1f1;
+                --ink-soft: #d0d0d0;
+                --ink-faint: #a0a0a0;
+                --hair: rgba(255, 255, 255, 0.12);
+                --image-border: rgba(255, 255, 255, 0.2);
+                --shadow: rgba(0, 0, 0, 0.42);
+            }
+
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+
+            body {
+                width: 620px;
+                padding: 10px;
+                color: var(--ink);
+                background: var(--page);
+                font-family: var(--font);
+                -webkit-font-smoothing: antialiased;
+                word-break: break-word;
+            }
+
+            .card {
+                position: relative;
+                width: 100%;
+                padding: 20px;
+                display: flex;
+                flex-direction: column;
+                gap: 14px;
+                overflow: hidden;
+                background: var(--card);
+                border-radius: var(--radius-card);
+                box-shadow: 0 2px 6px var(--shadow), 0 12px 28px -12px var(--shadow);
+            }
+
+            .card::before {
+                content: "";
+                position: absolute;
+                top: 0;
+                left: 22px;
+                right: 22px;
+                height: 3px;
+                background: var(--primary);
+                border-radius: 0 0 4px 4px;
+            }
+
+            .card > * { position: relative; z-index: 1; }
+
+            .top-row {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 12px;
+            }
+
+            .platform-chip {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                padding: 7px 12px;
+                color: var(--primary);
+                background: var(--primary-soft);
+                border: 1px solid var(--hair);
+                border-radius: 999px;
+                font-size: 14px;
+                font-weight: 700;
+            }
+
+            .platform-logo {
+                width: auto;
+                height: 25px;
+                display: block;
+                flex-shrink: 0;
+            }
+
+            .icon {
+                width: 17px;
+                height: 17px;
+                display: inline-block;
+                flex: 0 0 auto;
+                fill: currentColor;
+                vertical-align: -3px;
+            }
+
+            .cover-wrapper {
+                position: relative;
+                width: 100%;
+                overflow: hidden;
+                background: #000;
+                border: 2px solid var(--image-border);
+                border-radius: var(--radius-image);
+                box-shadow: 0 0 0 1px var(--hair), 0 12px 28px -10px var(--shadow);
+            }
+
+            .cover-img {
+                width: 100%;
+                max-height: 900px;
+                display: block;
+                object-fit: cover;
+            }
+
+            .play-button {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                width: 66px;
+                height: 66px;
+                display: grid;
+                place-items: center;
+                color: #fff;
+                background: rgba(255, 0, 0, 0.9);
+                border: 3px solid rgba(255, 255, 255, 0.92);
+                border-radius: 50%;
+                box-shadow: 0 6px 20px rgba(0, 0, 0, 0.32);
+                transform: translate(-50%, -50%);
+            }
+
+            .play-button::before {
+                content: "";
+                margin-left: 4px;
+                border-top: 10px solid transparent;
+                border-bottom: 10px solid transparent;
+                border-left: 15px solid #fff;
+            }
+
+            .video-meta {
+                position: absolute;
+                right: 9px;
+                bottom: 9px;
+                left: 9px;
+                display: flex;
+                justify-content: space-between;
+                gap: 8px;
+                color: #fff;
+                font-size: 11px;
+                font-variant-numeric: tabular-nums;
+            }
+
+            .video-meta span {
+                padding: 4px 7px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                background: rgba(0, 0, 0, 0.68);
+                border-radius: 3px;
+            }
+
+            .video-meta span:empty { display: none; }
+
+            .meta-row {
+                display: flex;
+                align-items: center;
+                flex-wrap: wrap;
+                gap: 5px;
+                color: var(--ink-faint);
+                font-size: 13px;
+            }
+
+            .meta-item {
+                display: inline-flex;
+                align-items: center;
+                gap: 5px;
+            }
+
+            .meta-item .icon { width: 15px; height: 15px; }
+            .meta-sep { opacity: 0.55; padding: 0 4px; }
+
+            .image-container {
+                width: 100%;
+                overflow: hidden;
+                background: var(--panel);
+                border: 2px solid var(--image-border);
+                border-radius: var(--radius-image);
+                box-shadow: 0 0 0 1px var(--hair), 0 10px 24px -12px var(--shadow);
+            }
+
+            .single-image {
+                width: 100%;
+                height: auto;
+                display: block;
+            }
+
+            .image-grid {
+                width: 100%;
+                display: grid;
+                gap: 10px;
+            }
+
+            .image-grid.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .image-grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+            .grid-item {
+                position: relative;
+                aspect-ratio: 1 / 1;
+                overflow: hidden;
+                background: var(--panel);
+                border: 1px solid var(--hair);
+                border-radius: 10px;
+            }
+
+            .grid-item img {
+                width: 100%;
+                height: 100%;
+                display: block;
+                object-fit: cover;
+            }
+
+            .more-count {
+                position: absolute;
+                inset: 0;
+                display: grid;
+                place-items: center;
+                color: #fff;
+                background: rgba(0, 0, 0, 0.54);
+                font-size: 25px;
+                font-weight: 700;
+            }
+
+            .title {
+                color: var(--ink);
+                font-size: 22px;
+                font-weight: 800;
+                line-height: 1.4;
+                white-space: pre-wrap;
+            }
+
+            .author-row {
+                display: flex;
+                align-items: center;
+                gap: 11px;
+            }
+
+            .author-avatar {
+                width: 45px;
+                height: 45px;
+                flex: 0 0 auto;
+                object-fit: cover;
+                border: 2px solid var(--primary);
+                border-radius: 50%;
+                box-shadow: 0 0 0 3px var(--card), 0 4px 12px -4px var(--shadow);
+            }
+
+            .author-meta {
+                min-width: 0;
+                display: flex;
+                flex-direction: column;
+                gap: 3px;
+            }
+
+            .author-name {
+                overflow: hidden;
+                color: var(--ink);
+                font-size: 16px;
+                font-weight: 700;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .author-time {
+                color: var(--ink-faint);
+                font-size: 12px;
+                font-variant-numeric: tabular-nums;
+            }
+
+            .stats-panel {
+                width: 100%;
+                display: flex;
+                align-items: stretch;
+                gap: 6px;
+                padding: 13px 7px;
+                background: var(--panel);
+                border: 1px solid var(--hair);
+                border-radius: var(--radius-panel);
+            }
+
+            .stat {
+                min-width: 0;
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 4px;
+            }
+
+            .stat-value {
+                display: inline-flex;
+                align-items: center;
+                gap: 5px;
+                color: var(--ink);
+                font-size: 17px;
+                font-weight: 700;
+                font-variant-numeric: tabular-nums;
+                line-height: 1.1;
+            }
+
+            .stat-value .icon { color: var(--primary); width: 16px; height: 16px; }
+            .stat-label { color: var(--ink-faint); font-size: 12px; }
+
+            .intro {
+                position: relative;
+                padding: 13px 15px 13px 18px;
+                overflow: hidden;
+                background: var(--panel);
+                border: 1px solid var(--hair);
+                border-radius: var(--radius-panel);
+            }
+
+            .intro::before {
+                content: "";
+                position: absolute;
+                top: 0;
+                bottom: 0;
+                left: 0;
+                width: 4px;
+                background: var(--primary);
+            }
+
+            .intro-text {
+                color: var(--ink-soft);
+                font-size: 14px;
+                line-height: 1.7;
+                white-space: pre-wrap;
+            }
+
+            .notice {
+                padding: 10px 12px;
+                color: var(--ink-soft);
+                background: var(--primary-soft);
+                border-left: 3px solid var(--primary);
+                border-radius: 6px;
+                font-size: 13px;
+                line-height: 1.5;
+            }
+
+            .footer {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 12px;
+                padding-top: 12px;
+                color: var(--ink-faint);
+                border-top: 1px solid var(--hair);
+                font-size: 11px;
+            }
+
+            .footer-url {
+                max-width: 72%;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .footer-brand { flex: 0 0 auto; }
+        </style>
+    </head>
+    <body>
+        {% macro icon(name) %}
+            {% if name == "play" %}
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
+            {% elif name == "clock" %}
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16zm.5-13H11v6l5 3 .75-1.23-4.25-2.52V7z" /></svg>
+            {% elif name == "eye" %}
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5C6.5 5 2.2 8.6 1 12c1.2 3.4 5.5 7 11 7s9.8-3.6 11-7c-1.2-3.4-5.5-7-11-7zm0 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-2.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z" /></svg>
+            {% elif name == "like" %}
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 10h4v11H2V10zm20 1.5c0-.83-.67-1.5-1.5-1.5h-5.6l.85-4.09.03-.29a1.13 1.13 0 0 0-.33-.79L14.5 4 8.6 9.9c-.37.37-.6.88-.6 1.44V19c0 1.1.9 2 2 2h8c.8 0 1.5-.5 1.8-1.2l3-7c.1-.24.15-.5.15-.8v-.5z" /></svg>
+            {% elif name == "comment" %}
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2z" /></svg>
+            {% elif name == "image" %}
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-0.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" /></svg>
+            {% endif %}
+        {% endmacro %}
+
+        {% macro render_images(images) %}
+            {% set count = images | length %}
+            {% if count == 1 %}
+                <div class="image-container">
+                    <img src="{{ images[0] | safe_src }}" class="single-image" alt="YouTube post image" />
+                </div>
+            {% elif count > 1 %}
+                {% set visible_count = 9 if count > 9 else count %}
+                {% set columns = 2 if count in [2, 4] else 3 %}
+                <div class="image-grid cols-{{ columns }}">
+                    {% for image in images[:visible_count] %}
+                        <div class="grid-item">
+                            <img src="{{ image | safe_src }}" alt="YouTube post image" />
+                            {% if loop.last and count > 9 %}
+                                <div class="more-count">+{{ count - 9 }}</div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endmacro %}
+
+        {% set content_type = result.content_type or "图文" %}
+        {% set video = result.video %}
+        {% set logo = result.platform | safe_src("get_logo_path", return_none_on_fail=True) %}
+        <main class="card">
+            <div class="top-row">
+                <div class="platform-chip">
+                    <span>{{ content_type }}</span>
+                    {{ icon("play" if content_type in ["视频", "直播"] else "image") }}
+                </div>
+                {% if logo %}
+                    <img class="platform-logo" src="{{ logo }}" alt="YouTube" />
+                {% endif %}
+            </div>
+
+            {% if video %}
+                <div class="cover-wrapper">
+                    <img src="{{ video | safe_src("get_cover_path") }}" class="cover-img" alt="Video cover" />
+                    <div class="play-button" aria-hidden="true"></div>
+                    <div class="video-meta">
+                        <span>{{ video.get_display_size() }}</span>
+                        <span>{{ video.display_duration }}</span>
+                    </div>
+                </div>
+            {% elif result.images %}
+                {{ render_images(result.images) }}
+            {% endif %}
+
+            {% if video and video.duration %}
+                <div class="meta-row">
+                    <span class="meta-item">{{ icon("clock") }}{{ video.display_duration }}</span>
+                    {% if result.extra.get("content_type") == "直播" %}
+                        <span class="meta-sep">·</span>
+                        <span class="meta-item">直播</span>
+                    {% endif %}
+                </div>
+            {% endif %}
+
+            {% if result.title %}
+                <div class="title">{{ result.title }}</div>
+            {% endif %}
+
+            {% if result.author %}
+                <div class="author-row">
+                    <img src="{{ result.author | safe_src("get_avatar_path") }}" class="author-avatar" alt="Author avatar" />
+                    <div class="author-meta">
+                        <div class="author-name">{{ result.author.name }}</div>
+                        {% if result.formatted_datetime %}
+                            <div class="author-time">{{ result.formatted_datetime }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endif %}
+
+            {% if result.extra.get("stats") %}
+                <div class="stats-panel">
+                    {% for stat in result.extra.get("stats") %}
+                        <div class="stat">
+                            <span class="stat-value">
+                                {% if stat.get("icon") %}{{ icon(stat.get("icon")) }}{% endif %}
+                                {{ stat.get("value") }}
+                            </span>
+                            <span class="stat-label">{{ stat.get("label") }}</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            {% if result.text %}
+                <div class="intro"><div class="intro-text">{{ result.text }}</div></div>
+            {% endif %}
+
+            {% if result.extra.get("attachment_tip") %}
+                <div class="notice">{{ result.extra.get("attachment_tip") }}</div>
+            {% endif %}
+
+            <footer class="footer">
+                <span class="footer-url">{{ result.url }}</span>
+                <span class="footer-brand">{{ result.bot_name }}解析</span>
+            </footer>
+        </main>
+    </body>
+</html>

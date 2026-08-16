@@ -26,6 +26,8 @@ def parse_hm_to_minutes(value: str) -> int:
 
 
 class Config(BaseModel):
+    plite_ytb_ck: str | None = None
+    """youtube cookies，Cookie 字符串会转换为 Netscape 文件"""
     plite_zhihu_ck: str | None = None
     """知乎 cookies"""
     plite_linuxdo_ck: str | None = None
@@ -170,9 +172,15 @@ class Config(BaseModel):
         return self.plite_linuxdo_ck
 
     @property
+<<<<<<< HEAD
     def x_ck(self) -> str | None:
         """X cookies"""
         return self.plite_x_ck
+=======
+    def ytb_ck(self) -> str | None:
+        """youtube cookies"""
+        return self.plite_ytb_ck
+>>>>>>> 454a6e3 (✨ feat(youtube): 完善油管解析与渲染)
 
     @property
     def need_upload_audio(self) -> bool:

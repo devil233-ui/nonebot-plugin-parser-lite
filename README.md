@@ -47,6 +47,7 @@
 | **壁吧专楼吧**       | ✅   | ✅         | 🚫   | 🚫         |
 | **TapTap**           | ✅   | ✅         | ✅   | 🚫         |
 | **网易大神**         | ✅   | ✅         | ✅   | 🚫         |
+| **YouTube**          | 🚫   | ❌         | ✅   | 🚫         |
 
 | 平台           | 音频支持 | 评论区渲染 |
 | :------------- | :------- | :--------- |
@@ -188,10 +189,12 @@ plite_max_size=90
 
 # [可选] 全局禁止的解析
 # 示例 plite_disabled_platforms=["bilibili", "douyin"] 表示禁止了哔哩哔哩和抖音
+# YouTube的规范值为"youtube"，也兼容常用别名"ytb"
 # 可选值: ["acfun", "bilibili", "buff", "coolapk", "douban", "doubao",
 # "douyin", "ds", "duitang", "5eplay", "heybox", "hupu", "illu", "kuaishou",
 # "kugou", "kuwo", "linuxdo", "lofter", "miyoushe", "netease", "qsmusic",
-# "rednote", "taptap", "tieba", "weibo", "wmpvp", "x", "zhihu", "zlb"]
+# "rednote", "taptap", "tieba", "weibo", "wmpvp", "x", "youtube", "ytb",
+# "zhihu", "zlb"]
 plite_disabled_platforms=["x"]
 
 # [可选] 黑名单用户列表
@@ -253,6 +256,14 @@ plite_zhihu_ck="z_c0=xxxx"
 
 # [可选] linuxdo cookie, 部分帖子需要登录或有一定的阅读等级才可以查看
 plite_linuxdo_ck="xxxx"
+
+# [可选] 自建网易云 API；配置后优先使用，失败时回退上游接口
+plite_netease_local_api="http://127.0.0.1:4000"
+
+# [可选] YouTube Cookie 请求头；会转换为 Netscape 文件
+# 也可以直接把 yt-dlp 导出的 ytb_cookies.txt 放入插件配置目录
+# 油管链接支持 watch、shorts、live 和 youtu.be 短链；yt-dlp 还需要主机提供 Deno 或 Node.js
+plite_ytb_ck="xxxxxxxxxx=yyyyyyyyyy;PREF=zzzzzzzzzz"
 
 # [可选] X cookie, R18帖子和帖子翻译需要登录才可以查看
 plite_x_ck="auth_token=xxx"
