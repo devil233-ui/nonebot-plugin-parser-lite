@@ -654,12 +654,31 @@ class Renderer:
 
     async def resolve_parse_result(self, result: ParseResult) -> dict[str, Any]:
         """解析 ParseResult 为模板可用的字典数据"""
+        text_parts = [item for item in result.content if isinstance(item, str)]
+        video = next(
+            (item for item in result.content if isinstance(item, VideoContent)),
+            None,
+        )
+        images = [
+            item for item in result.content if isinstance(item, ImageContent)
+        ]
+        text = "\n".join(text_parts) or None
+        if result.platform.name == "youtube" and text:
+            text = text.removeprefix("简介: ")
+
         data: dict[str, Any] = {
+            "url": result.url,
             "title": result.title,
-            "formatted_datetime": result.formatted_datetime,
+            "formatted_datetime": result.extra.get("datetime_text")
+            or result.formatted_datetime,
             "extra": result.extra,
             "platform": result.platform,
             "content": result.content,
+            "text": text,
+            "video": video,
+            "images": images,
+            "content_type": result.extra.get("content_type")
+            or ("视频" if video else "图文"),
             "stats": result.stats,
             "comments": result.comments[: pconfig.max_comments],
             "author": result.author,

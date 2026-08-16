@@ -68,6 +68,14 @@ class PlatformEnum(str, Enum):
     ZLB = "zlb"
     TAPTAP = "taptap"
     DS = "ds"
+    YOUTUBE = "youtube"
+
+    @classmethod
+    def _missing_(cls, value: object) -> "PlatformEnum | None":
+        """兼容 YouTube 配置中常用的 ytb 名称。"""
+        if value == "ytb":
+            return cls.YOUTUBE
+        return None
 
     def __str__(self) -> str:
         return self.value

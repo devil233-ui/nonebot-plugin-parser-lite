@@ -894,3 +894,13 @@ class StreamDownloader:
 
 
 DOWNLOADER: StreamDownloader = StreamDownloader()
+
+yt_dlp_downloader = None
+"""yt-dlp 下载器实例；未安装 yt-dlp 时油管解析器保持不可用。"""
+
+try:
+    from .ytdlp import YtdlpDownloader
+except ImportError as e:
+    logger.debug(f"yt-dlp 未安装，跳过油管下载器: {e}")
+else:
+    yt_dlp_downloader = YtdlpDownloader()

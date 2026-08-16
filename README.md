@@ -47,6 +47,7 @@
 | **壁吧专楼吧**       | ✅   | ✅         | 🚫   | 🚫         |
 | **TapTap**           | ✅   | ✅         | ✅   | 🚫         |
 | **网易大神**         | ✅   | ✅         | ✅   | 🚫         |
+| **YouTube**          | 🚫   | ❌         | ✅   | 🚫         |
 
 | 平台           | 音频支持 | 评论区渲染 |
 | :------------- | :------- | :--------- |
@@ -160,7 +161,8 @@ plite_max_size=90
 
 # [可选] 全局禁止的解析
 # 示例 plite_disabled_platforms=["bilibili", "douyin"] 表示禁止了哔哩哔哩和抖音
-# 可选值: ["bilibili", "douyin", "kuaishou", "x", "acfun", "weibo", "rednote"]
+# YouTube 的规范值为 "youtube"，也兼容常用别名 "ytb"
+# 可选值: ["bilibili", "douyin", "kuaishou", "x", "acfun", "weibo", "rednote", "youtube", "ytb"]
 plite_disabled_platforms=["x"]
 
 # [可选] 黑名单用户列表
@@ -225,6 +227,11 @@ plite_linuxdo_ck="xxxx"
 
 # [可选] 自建网易云 API；配置后优先使用，失败时回退上游接口
 plite_netease_local_api="http://127.0.0.1:4000"
+
+# [可选] YouTube Cookie 请求头；会转换为 Netscape 文件
+# 也可以直接把 yt-dlp 导出的 ytb_cookies.txt 放入插件配置目录
+# 油管链接支持 watch、shorts、live 和 youtu.be 短链；yt-dlp 还需要主机提供 Deno 或 Node.js
+plite_ytb_ck="xxxxxxxxxx=yyyyyyyyyy;PREF=zzzzzzzzzz"
 ```
 
 </details>
