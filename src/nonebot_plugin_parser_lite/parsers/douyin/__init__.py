@@ -108,7 +108,10 @@ class DouyinParser(BaseParser):
                     avatar_url=room.owner.avatar_thumb.url_list[-1],
                     id=room.owner.id_str,
                 ),
-                content=[self.create_image(url=room.cover.url_list[-1])],
+                content=[
+                    self.create_image(url=room.cover.url_list[-1]),
+                    "直播中" if room.status == 2 else "未开播",
+                ],
                 url=f"https://live.douyin.com/{web_rid}",
                 title=room.title,
                 stats=self.create_stats(

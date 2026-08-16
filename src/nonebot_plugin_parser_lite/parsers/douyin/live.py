@@ -17,6 +17,7 @@ class RoomViewStats(Struct):
 
 class Room(Struct):
     id_str: str
+    status: int
     title: str
     cover: UrlList
     owner: Owner
