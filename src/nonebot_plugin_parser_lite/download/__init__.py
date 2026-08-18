@@ -43,18 +43,16 @@ _CONTENT_TYPE_SUFFIX_OVERRIDES = {
 
 
 def _with_identity_encoding(headers: dict[str, str]) -> dict[str, str]:
-    """让文件长度、Content-Length 与 Range 使用同一字节坐标系。"""
+    """让文件长度、Content-Length 与 Range 使用同一字节坐标系"""
     result = {
-        key: value
-        for key, value in headers.items()
-        if key.lower() != "accept-encoding"
+        key: value for key, value in headers.items() if key.lower() != "accept-encoding"
     }
     result["Accept-Encoding"] = "identity"
     return result
 
 
 def _parse_content_encodings(value: str | None) -> tuple[str, ...]:
-    """解析 Content-Encoding 编码链，忽略空标记并统一大小写。"""
+    """解析 Content-Encoding 编码链，忽略空标记并统一大小写"""
     return tuple(
         encoding
         for token in (value or "").split(",")
@@ -181,7 +179,7 @@ class StreamDownloader:
         base_path = cache_dir / cache_name
         partial_path = cache_dir / f"{cache_name}.part"
 
-        headers = _with_identity_encoding({**self.headers, **(ext_headers or {})})
+        headers = _with_identity_encoding(self.headers | (ext_headers or {}))
         download_key = str(base_path)
         active_download = self._active_downloads.get(download_key)
         if active_download is not None:
@@ -265,26 +263,26 @@ class StreamDownloader:
 
     def __validate_response(self, response: UniResponse, downloaded: int):
         if downloaded > 0 and response.status_code == 416:
-            raise RetryableDownloadError(
-                "断点位置无效，重新完整下载", keep_part=False
-            )
+            raise RetryableDownloadError("断点位置无效，重新完整下载", keep_part=False)
         response.raise_for_status()
         if downloaded > 0:
-            if response.status_code != 206:
-                raise RetryableDownloadError("服务器不支持断点续传", keep_part=False)
-            content_range = response.headers.get("content-range")
-            match = _RE_RANGE_PATTERN.fullmatch(content_range or "")
-            if match is None:
-                raise RetryableDownloadError(
-                    "服务器未返回有效的 Content-Range", keep_part=False
-                )
+            self.__validate_header(response, downloaded)
 
-            server_start = int(match[1])
-            if server_start != downloaded:
-                raise RetryableDownloadError(
-                    f"Content-Range 错误: 请求 {downloaded}, 返回 {server_start}",
-                    keep_part=False,
-                )
+    def __validate_header(self, response: UniResponse, downloaded: int):
+        if response.status_code != 206:
+            raise RetryableDownloadError("服务器不支持断点续传", keep_part=False)
+        content_range = response.headers.get("content-range") or ""
+        match = _RE_RANGE_PATTERN.fullmatch(content_range)
+        if match is None:
+            raise RetryableDownloadError(
+                "服务器未返回有效的 Content-Range", keep_part=False
+            )
+        server_start = int(match[1])
+        if server_start != downloaded:
+            raise RetryableDownloadError(
+                f"Content-Range 错误: 请求 {downloaded}, 返回 {server_start}",
+                keep_part=False,
+            )
 
     def __make_range_headers(
         self, headers: dict[str, str], downloaded: int
@@ -313,11 +311,11 @@ class StreamDownloader:
             content_encodings = _parse_content_encodings(
                 response.headers.get("content-encoding")
             )
-            transfer_encoded = any(
+            zipped_content = any(
                 encoding != "identity" for encoding in content_encodings
             )
 
-            if downloaded > 0 and transfer_encoded:
+            if downloaded > 0 and zipped_content:
                 raise RetryableDownloadError(
                     f"压缩响应 {', '.join(content_encodings)!r} 无法安全断点续传",
                     keep_part=False,
@@ -327,7 +325,7 @@ class StreamDownloader:
             # 返回解码后的文件内容，不能用前者校验后者。正常情况下
             # Accept-Encoding: identity 会避免进入此兼容分支。
             content_length = (
-                None if transfer_encoded else response.headers.get("content-length")
+                None if zipped_content else response.headers.get("content-length")
             )
             content_type = response.headers.get("content-type")
 
