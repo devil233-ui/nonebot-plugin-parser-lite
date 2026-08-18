@@ -1,9 +1,9 @@
 from google.protobuf.descriptor import FieldDescriptor
 import google.protobuf.descriptor_pb2 as pb2
 from google.protobuf.descriptor_pb2 import (
-    global___DescriptorProto,
-    global___EnumDescriptorProto,
-    global___FieldDescriptorProto,
+    DescriptorProto,
+    EnumDescriptorProto,
+    FieldDescriptorProto,
 )
 
 
@@ -31,20 +31,20 @@ def run_ultimate_restore(desc_path, output_proto):
         FieldDescriptor.TYPE_SINT64: "sint64",
     }
 
-    def get_clean_type(fld: global___FieldDescriptorProto):
+    def get_clean_type(fld: FieldDescriptorProto):
         """剥离包名，获取类名"""
         if fld.type_name:
             return fld.type_name.split(".")[-1]
         return TYPE_STR.get(fld.type, "string")
 
-    def process_enum(enum: global___EnumDescriptorProto, indent=""):
+    def process_enum(enum: EnumDescriptorProto, indent=""):
         lines = [f"{indent}enum {enum.name} {{"]
         for v in enum.value:
             lines.append(f"{indent}  {v.name} = {v.number};")
         lines.append(f"{indent}}}")
         return lines
 
-    def process_msg(msg: global___DescriptorProto, indent=""):
+    def process_msg(msg: DescriptorProto, indent=""):
         lines = [f"{indent}message {msg.name} {{"]
 
         # 1. 预处理：识别 MapEntry
@@ -65,7 +65,7 @@ def run_ultimate_restore(desc_path, output_proto):
             lines.append("")
 
         # 3. 字段处理 (包含 Oneof 分组逻辑)
-        oneof_groups: dict[int, list[global___FieldDescriptorProto]] = {}
+        oneof_groups: dict[int, list[FieldDescriptorProto]] = {}
 
         for fld in msg.field:
             if fld.HasField("oneof_index"):
