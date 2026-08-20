@@ -38,6 +38,7 @@ class FFmpeg:
         try:
             process = await asyncio.create_subprocess_exec(
                 *full_cmd,
+                stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
