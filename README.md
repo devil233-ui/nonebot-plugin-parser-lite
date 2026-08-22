@@ -247,12 +247,12 @@ npm run build:css
   <img src="https://contrib.rocks/image?repo=sokoko-org/nonebot-plugin-parser-lite" />
 </a>
 
-- [fllesser/nonebot-plugin-parser](https://github.com/fllesser/nonebot-plugin-parser) 社交媒体分享链接解析插件
-- [LoCCai/nonebot-plugin-parser-m](https://github.com/LoCCai/nonebot-plugin-parser-m) 社交媒体分享链接解析插件
-- [lumina37/aiotieba](https://github.com/lumina37/aiotieba) 贴吧接口合集✨可用于工具箱/吧务管理/数据采集
-- [ikenxuan/karin-plugin-kkk](https://github.com/ikenxuan/karin-plugin-kkk) 给群聊机器人提供视频作品、动态解析和推送功能，并使用 React + Tailwindcss 构建出现代审美设计的信息卡片
-- [ikenxuan/amagi](https://github.com/ikenxuan/amagi) 抖音、B站 web 端相关数据接口封装基于 Node.js 的实现
-- [zly2006/zhihu-plus-plus](https://github.com/zly2006/zhihu-plus-plus) Zhihu++ | 知乎++: Ad-free, low cost, AI powered zhihu android 3rd-party client. 去广告、占用低、AI大模型的新时代知乎安卓端体验
+- [fllesser/nonebot-plugin-parser](https://github.com/fllesser/nonebot-plugin-parser) 原始项目
+- [LoCCai/nonebot-plugin-parser-m](https://github.com/LoCCai/nonebot-plugin-parser-m) 本项目基于此项目开发，并在此基础上进行了大幅重构
+- [lumina37/aiotieba](https://github.com/lumina37/aiotieba) 贴吧解析参考
+- [ikenxuan/karin-plugin-kkk](https://github.com/ikenxuan/karin-plugin-kkk) 部分逻辑参考
+- [ikenxuan/amagi](https://github.com/ikenxuan/amagi) 部分接口参考
+- [zly2006/zhihu-plus-plus](https://github.com/zly2006/zhihu-plus-plus) 知乎解析参考
 - [Uesugi Hanako](https://github.com/negichan) 渲染模板设计和部分签名算法
 - [soloxiaoye2022](https://github.com/soloxiaoye2022) 部分签名算法
 - 致2026年的你们
