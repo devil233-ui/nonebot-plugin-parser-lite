@@ -166,7 +166,7 @@ plite_blacklist_users=[]
 # [可选] 是否在解析结果中附加原始URL
 plite_append_url=False
 
-# [可选] 是否在解析结果中附加嵌入式播放链接
+# [可选] 是否在解析结果中添加`在线播放`链接(如果有)
 plite_embed_url=False
 
 # [可选] 是否在解析结果中添加原始URL二维码
