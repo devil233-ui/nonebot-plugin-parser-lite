@@ -73,6 +73,20 @@ class UniResponse:
         return self._raw.content
 
     @property
+    def cookies(self) -> dict[str, str]:
+        """返回当前响应通过 Set-Cookie 下发的 Cookie。"""
+        raw_cookies = getattr(self._raw, "cookies", None)
+        if raw_cookies is None:
+            return {}
+        try:
+            return {
+                str(name): str(value)
+                for name, value in raw_cookies.get_dict().items()
+            }
+        except AttributeError:
+            return {}
+
+    @property
     def is_success(self) -> bool:
         return codes.is_success(self.status_code)
 
