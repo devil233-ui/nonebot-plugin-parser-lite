@@ -107,6 +107,8 @@ uv add --requirements requirements.txt
 >
 > 插件会自动使用系统环境中的http系统代理进行网络请求
 
+下面的内容可以粘贴到 `.env`  或 `.env.dev` / `.env.prod` 等文件
+
 <details>
 <summary>配置项</summary>
 
