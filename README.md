@@ -223,6 +223,8 @@ plite_day_range=["6:00", "19:00"]
 plite_zhihu_ck="z_c0=xxxx"
 
 # [可选] linuxdo cookie, 部分帖子需要登录或有一定的阅读等级才可以查看
+# 首次成功请求后会把服务器更新的 Cookie 保存到插件配置目录 linuxdo_cookies.txt
+# 配置项非空时会优先使用它并补齐缓存；清空后才使用缓存文件
 plite_linuxdo_ck="xxxx"
 
 # [可选] 自建网易云 API；配置后优先使用，失败时回退上游接口
