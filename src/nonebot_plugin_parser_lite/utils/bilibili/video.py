@@ -407,7 +407,7 @@ def sanitize_stream_urls(
             stream.url
         ]
         download_urls = list(
-            dict.fromkeys([_replace_host(clean_urls[0]), *clean_urls[1:]])
+            dict.fromkeys([_replace_host(clean_urls[0]), *clean_urls])
         )
         stream.url = download_urls[0]
         stream.backup_url = download_urls[1:]
