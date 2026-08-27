@@ -1,3 +1,5 @@
+from urllib.parse import parse_qs, urlparse
+
 from msgspec import Struct, field
 import ujson
 
@@ -6,10 +8,21 @@ from ...creator import ContentItem, Creator
 
 class Addr(Struct):
     uri: str
+    url_list: list[str] = field(default_factory=list)
+
+    @property
+    def file_id(self) -> str | None:
+        try:
+            wrapped_url = self.url_list[-1]
+            return parse_qs(urlparse(wrapped_url).query).get("file_id", [])[0]
+        except Exception:
+            return None
 
     @property
     def url(self) -> str:
-        return f"https://aweme.snssdk.com/aweme/v1/play/?video_id={self.uri}&ratio=1080p&line=0"
+        if file_id := self.file_id:
+            return f"https://aweme.snssdk.com/aweme/v1/play/?video_id={self.uri}&file_id={file_id}"
+        return f"https://aweme.snssdk.com/aweme/v1/play/?video_id={self.uri}"
 
 
 class Statistics(Struct):
