@@ -14,6 +14,30 @@ from ...utils.cookie import ck2dict
 
 SESSION_URL = "https://linux.do/session/current.json"
 COOKIE_FILE_NAME = "linuxdo_cookies.txt"
+IDENTITY_COOKIE_NAME = "_t"
+CLEARED_COOKIE_VALUES = frozenset({"", "deleted", "null", "none", "undefined", "-"})
+
+
+def is_cleared_cookie(value: str | None) -> bool:
+    """判断 Cookie 值是否为空值或服务端下发的清除占位值。"""
+    if value is None:
+        return True
+    return value.strip().strip('"').lower() in CLEARED_COOKIE_VALUES
+
+
+def drop_cleared_cookies(
+    cookies: dict[str, str], *, source: str
+) -> dict[str, str]:
+    """剔除空值 Cookie，避免无效凭据被采纳或写入缓存。"""
+    kept = {
+        name: value
+        for name, value in cookies.items()
+        if not is_cleared_cookie(value)
+    }
+    if len(kept) != len(cookies):
+        dropped = sorted(set(cookies) - set(kept))
+        logger.debug(f"Linux.do 丢弃{source}的空值 Cookie: {dropped}")
+    return kept
 
 
 def format_response_diagnostics(response: UniResponse) -> str:
@@ -68,10 +92,11 @@ class LinuxDoAuth:
         if not raw.strip():
             return {}
         try:
-            return ck2dict(raw)
+            parsed = ck2dict(raw)
         except (AttributeError, TypeError, ValueError):
             logger.warning("Linux.do Cookie 格式无效，忽略该来源")
             return {}
+        return drop_cleared_cookies(parsed, source="来源")
 
     @staticmethod
     def _serialize_cookie(cookies: dict[str, str]) -> str:
@@ -101,7 +126,9 @@ class LinuxDoAuth:
             return dict(await self._ensure_loaded())
 
     async def _persist_locked(self) -> None:
-        cookies = await self._ensure_loaded()
+        cookies = drop_cleared_cookies(
+            await self._ensure_loaded(), source="缓存"
+        )
         if not cookies:
             return
 
@@ -123,7 +150,9 @@ class LinuxDoAuth:
             )
 
     async def update_from_response(self, response: UniResponse) -> None:
-        response_cookies = response.cookies
+        response_cookies = drop_cleared_cookies(
+            response.cookies, source="响应"
+        )
         async with self._cookie_lock:
             cookies = await self._ensure_loaded()
             changed = any(
@@ -152,6 +181,13 @@ class LinuxDoAuth:
 
             cookies = await self.cookies()
             if not cookies:
+                return self._set_validation(False, self._FAILED_VALIDATION_TTL)
+
+            if is_cleared_cookie(cookies.get(IDENTITY_COOKIE_NAME)):
+                logger.warning(
+                    f"Linux.do 缺少有效身份 Cookie {IDENTITY_COOKIE_NAME}，"
+                    "请更新 plite_linuxdo_ck 或 Cookie 缓存"
+                )
                 return self._set_validation(False, self._FAILED_VALIDATION_TTL)
 
             try:
