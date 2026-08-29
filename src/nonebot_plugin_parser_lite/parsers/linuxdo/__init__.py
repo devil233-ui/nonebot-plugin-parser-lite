@@ -1,5 +1,7 @@
 from typing import ClassVar
 
+from nonebot import logger
+
 from ...utils.format import format_num
 from ..base import (
     DOWNLOADER,
@@ -9,7 +11,7 @@ from ..base import (
     PlatformEnum,
     handle,
 )
-from .auth import LinuxDoAuth
+from .auth import LinuxDoAuth, format_response_diagnostics
 from .topic import decoder as postDecoder
 
 
@@ -34,8 +36,11 @@ class LinuxDoParser(BaseParser):
             cookies=cookies,
         )
         await auth.update_from_response(res)
+        response_diagnostics = format_response_diagnostics(res)
         if not res.is_success:
+            logger.warning(f"Linux.do 帖子响应异常: {response_diagnostics}")
             raise await auth.tip_for_status(res.status_code)
+        logger.info(f"Linux.do 帖子响应成功: {response_diagnostics}")
         post = postDecoder.decode(res.content)
         return self.result(
             author=self.create_author(

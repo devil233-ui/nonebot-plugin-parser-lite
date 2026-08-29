@@ -16,6 +16,19 @@ SESSION_URL = "https://linux.do/session/current.json"
 COOKIE_FILE_NAME = "linuxdo_cookies.txt"
 
 
+def format_response_diagnostics(response: UniResponse) -> str:
+    """格式化不含 Cookie 和正文的响应诊断信息。"""
+    headers = response.headers
+    cf_headers = sorted(name for name in headers if name.lower().startswith("cf-"))
+    return (
+        f"status={response.status_code} url={response.url} "
+        f"content_type={headers.get('content-type')!r} "
+        f"server={headers.get('server')!r} "
+        f"content_length={headers.get('content-length')!r} "
+        f"cf_headers={cf_headers}"
+    )
+
+
 class LinuxDoAuth:
     # 管理 Cookie、登录态验证和服务端 Cookie 续用。
 
@@ -155,15 +168,28 @@ class LinuxDoAuth:
                 return self._set_validation(None, self._UNKNOWN_VALIDATION_TTL)
 
             await self.update_from_response(response)
+            response_diagnostics = format_response_diagnostics(response)
             if response.status_code != 200:
+                logger.warning(
+                    f"Linux.do 登录态响应异常: {response_diagnostics}"
+                )
                 return self._set_validation(None, self._UNKNOWN_VALIDATION_TTL)
 
             try:
                 data = response.json()
-            except Exception:
+            except Exception as exc:
+                logger.warning(
+                    "Linux.do 登录态响应 JSON 解析失败: "
+                    f"{type(exc).__name__}; {response_diagnostics}"
+                )
                 return self._set_validation(None, self._UNKNOWN_VALIDATION_TTL)
 
             logged_in = isinstance(data, dict) and bool(data.get("current_user"))
+            logger.info(
+                "Linux.do 登录态判定: "
+                f"{response_diagnostics} "
+                f"current_user={'present' if logged_in else 'absent'}"
+            )
             async with self._cookie_lock:
                 await self._persist_locked()
             return self._set_validation(
