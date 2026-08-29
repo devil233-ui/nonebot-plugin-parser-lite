@@ -355,9 +355,6 @@ class BilibiliParser(BaseParser):
             cache_key=cache_key,
         )
 
-        # B 站视频与音频流分离时，卡片体积应包含两条源流。
-        source_url_groups = get_source_stream_groups(video_urls, audio_urls)
-
         async def probe_head_size(url: str) -> int | None:
             return await DOWNLOADER.head_size(
                 url=url,
@@ -365,12 +362,10 @@ class BilibiliParser(BaseParser):
             )
 
         source_sizes = await asyncio.gather(
-            *(probe_source_size(urls, probe_head_size) for urls in source_url_groups),
+            *(probe_source_size(urls, probe_head_size) for urls in (video_urls, audio_urls)),
             return_exceptions=True,
         )
-        total_size = sum(
-            size for size in source_sizes if isinstance(size, int) and size > 0
-        )
+        total_size =  sum(filter(None, source_sizes))
         if total_size:
             video_content._size_bytes = total_size
 
