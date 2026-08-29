@@ -57,6 +57,7 @@ from .dynamic import DynamicData, DynamicInfo
 from .favlist import FavData
 from .live import RoomData
 from .opus import ImageNode, OpusItem, TextNode
+from .size import get_source_stream_groups, probe_source_size
 from .video import AIConclusion, VideoInfo
 
 
@@ -353,6 +354,25 @@ class BilibiliParser(BaseParser):
             ext_headers=self.headers,
             cache_key=cache_key,
         )
+
+        # B 站视频与音频流分离时，卡片体积应包含两条源流。
+        source_url_groups = get_source_stream_groups(video_urls, audio_urls)
+
+        async def probe_head_size(url: str) -> int | None:
+            return await DOWNLOADER.head_size(
+                url=url,
+                ext_headers=self.headers,
+            )
+
+        source_sizes = await asyncio.gather(
+            *(probe_source_size(urls, probe_head_size) for urls in source_url_groups),
+            return_exceptions=True,
+        )
+        total_size = sum(
+            size for size in source_sizes if isinstance(size, int) and size > 0
+        )
+        if total_size:
+            video_content._size_bytes = total_size
 
         # 提取统计数据
         stats = self.create_stats()

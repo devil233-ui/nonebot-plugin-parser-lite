@@ -123,6 +123,8 @@ class StreamDownloader:
         response = await self.head(
             url, ext_headers=ext_headers, use_curl_cffi=use_curl_cffi
         )
+        if not response.is_success:
+            return None
         raw_len = response.headers.get("content-length")
         if not raw_len:
             return None
