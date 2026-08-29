@@ -57,7 +57,7 @@ from .dynamic import DynamicData, DynamicInfo
 from .favlist import FavData
 from .live import RoomData
 from .opus import ImageNode, OpusItem, TextNode
-from .size import get_source_stream_groups, probe_source_size
+from .size import probe_source_size
 from .video import AIConclusion, VideoInfo
 
 
@@ -362,7 +362,10 @@ class BilibiliParser(BaseParser):
             )
 
         source_sizes = await asyncio.gather(
-            *(probe_source_size(urls, probe_head_size) for urls in (video_urls, audio_urls)),
+            *(
+                probe_source_size(urls, probe_head_size)
+                for urls in (video_urls, audio_urls)
+            ),
             return_exceptions=True,
         )
         total_size = sum(filter(None, source_sizes))
