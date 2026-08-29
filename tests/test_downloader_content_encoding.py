@@ -234,6 +234,22 @@ def _new_downloader(download, client):
     return downloader
 
 
+@pytest.mark.asyncio
+async def test_head_size_ignores_error_response_length(downloader_modules):
+    download, _, _ = downloader_modules
+    downloader = object.__new__(download.StreamDownloader)
+
+    async def fake_head(*args, **kwargs):
+        return SimpleNamespace(
+            is_success=False,
+            headers={"content-length": "335000000"},
+        )
+
+    downloader.head = fake_head
+
+    assert await downloader.head_size("https://cdn.example/video.m4s") is None
+
+
 async def _download_image(downloader, cache_manager):
     return await downloader.streamd(
         url="https://cdn.example/image.webp",

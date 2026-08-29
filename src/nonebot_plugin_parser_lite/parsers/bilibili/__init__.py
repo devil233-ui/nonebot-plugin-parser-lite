@@ -57,6 +57,7 @@ from .dynamic import DynamicData, DynamicInfo
 from .favlist import FavData
 from .live import RoomData
 from .opus import ImageNode, OpusItem, TextNode
+from .size import probe_source_size
 from .video import AIConclusion, VideoInfo
 
 
@@ -353,6 +354,23 @@ class BilibiliParser(BaseParser):
             ext_headers=self.headers,
             cache_key=cache_key,
         )
+
+        async def probe_head_size(url: str) -> int | None:
+            return await DOWNLOADER.head_size(
+                url=url,
+                ext_headers=self.headers,
+            )
+
+        source_sizes = await asyncio.gather(
+            *(
+                probe_source_size(urls, probe_head_size)
+                for urls in (video_urls, audio_urls)
+            ),
+            return_exceptions=True,
+        )
+        total_size = sum(filter(None, source_sizes))
+        if total_size:
+            video_content._size_bytes = total_size
 
         # 提取统计数据
         stats = self.create_stats()
