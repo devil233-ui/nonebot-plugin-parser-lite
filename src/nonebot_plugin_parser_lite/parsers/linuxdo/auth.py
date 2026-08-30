@@ -88,15 +88,15 @@ class LinuxDoAuth:
         self._validation_expires_at = 0.0
 
     @staticmethod
-    def _parse_cookie(raw: str) -> dict[str, str]:
+    def _parse_cookie(raw: str, *, source: str) -> dict[str, str]:
         if not raw.strip():
             return {}
         try:
             parsed = ck2dict(raw)
         except (AttributeError, TypeError, ValueError):
-            logger.warning("Linux.do Cookie 格式无效，忽略该来源")
+            logger.warning(f"Linux.do {source} Cookie 格式无效，忽略该来源")
             return {}
-        return drop_cleared_cookies(parsed, source="来源")
+        return drop_cleared_cookies(parsed, source=source)
 
     @staticmethod
     def _serialize_cookie(cookies: dict[str, str]) -> str:
@@ -107,7 +107,9 @@ class LinuxDoAuth:
     async def _read_cookie_file(self) -> dict[str, str]:
         try:
             if await self.cookie_path.exists():
-                return self._parse_cookie(await self.cookie_path.read_text())
+                return self._parse_cookie(
+                    await self.cookie_path.read_text(), source="磁盘缓存"
+                )
         except Exception as exc:
             logger.warning(f"读取 Linux.do Cookie 缓存失败: {type(exc).__name__}")
         return {}
@@ -117,7 +119,9 @@ class LinuxDoAuth:
             return self._cookies
 
         cached = await self._read_cookie_file()
-        bootstrap = self._parse_cookie(pconfig.linuxdo_ck or "")
+        bootstrap = self._parse_cookie(
+            pconfig.linuxdo_ck or "", source="配置 bootstrap"
+        )
         self._cookies = {**cached, **bootstrap}
         return self._cookies
 
@@ -127,7 +131,7 @@ class LinuxDoAuth:
 
     async def _persist_locked(self) -> None:
         cookies = drop_cleared_cookies(
-            await self._ensure_loaded(), source="缓存"
+            await self._ensure_loaded(), source="持久化前缓存"
         )
         if not cookies:
             return
