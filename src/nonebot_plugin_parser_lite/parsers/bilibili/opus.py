@@ -158,6 +158,7 @@ class OpusItem(Struct):
                         )
                         if text_content := text_content.strip():
                             yield TextNode(text=text_content)
+                        yield TextNode(text="\n")
 
                     # 处理图片段落
                     if paragraph.pic and paragraph.pic.pics:

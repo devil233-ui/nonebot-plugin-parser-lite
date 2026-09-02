@@ -366,7 +366,6 @@ class BilibiliParser(BaseParser):
                 probe_source_size(urls, probe_head_size)
                 for urls in (video_urls, audio_urls)
             ),
-            return_exceptions=True,
         )
         total_size = sum(filter(None, source_sizes))
         if total_size:

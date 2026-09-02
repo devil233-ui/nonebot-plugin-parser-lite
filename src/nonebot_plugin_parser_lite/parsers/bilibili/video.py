@@ -47,8 +47,6 @@ class VideoInfo(Struct):
     """bvid"""
     title: str
     """标题"""
-    desc: str
-    """简介"""
     duration: int
     """时长"""
     owner: Upper
@@ -63,6 +61,8 @@ class VideoInfo(Struct):
     """封面图片"""
     pages: list[Page] | None = None
     """分集信息"""
+    desc: str | None = None
+    """简介"""
 
     def extract_info_with_page(self, page_num: int = 1) -> PageInfo:
         """获取视频信息，包含页索引、标题、时长、封面
