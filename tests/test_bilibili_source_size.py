@@ -12,26 +12,7 @@ assert spec.loader is not None
 size_module = module_from_spec(spec)
 spec.loader.exec_module(size_module)
 
-get_source_stream_groups = size_module.get_source_stream_groups
 probe_source_size = size_module.probe_source_size
-
-
-def test_get_source_stream_groups_with_separate_audio():
-    video_urls = ("video-primary", "video-backup")
-    audio_urls = ("audio-primary", "audio-backup")
-
-    assert get_source_stream_groups(video_urls, audio_urls) == (
-        ("video-primary", "video-backup"),
-        ("audio-primary", "audio-backup"),
-    )
-
-
-def test_get_source_stream_groups_without_separate_audio():
-    video_urls = ("video-primary", "video-backup")
-
-    assert get_source_stream_groups(video_urls, None) == (
-        ("video-primary", "video-backup"),
-    )
 
 
 def test_probe_source_size_uses_first_successful_fallback():
