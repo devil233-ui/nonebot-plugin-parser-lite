@@ -8,7 +8,7 @@ from yarl import URL
 
 from .a2v import av2bv, bv2av
 from .cdn import choose_cdn_domain, normalize_cdn_domain
-from .client import CLIENT
+from .client import HTTP_CLIENT
 from .credential import Credential
 from .exceptions import BiliHelperException
 from .sign import encWbi, getWbiKeys
@@ -126,7 +126,7 @@ class Video:
         """
         if not self.info:
             result = (
-                await CLIENT.get(
+                await HTTP_CLIENT.get(
                     url="https://api.bilibili.com/x/web-interface/view",
                     params={"bvid": self.bvid, "aid": self.aid},
                     cookies=self.credential.get_cookies(),
@@ -229,7 +229,7 @@ class Video:
             params["platform"] = "html5"
             params["high_quality"] = "1"
         result = (
-            await CLIENT.get(
+            await HTTP_CLIENT.get(
                 url="https://api.bilibili.com/x/player/wbi/playurl",
                 params=encWbi(params, *(await getWbiKeys())),
                 cookies=self.credential.get_cookies(),
@@ -270,7 +270,7 @@ class Video:
             "web_location": "333.788",
         }
         result = (
-            await CLIENT.get(
+            await HTTP_CLIENT.get(
                 url="https://api.bilibili.com/x/web-interface/view/conclusion/get",
                 params=encWbi(params, *(await getWbiKeys())),
                 cookies=self.credential.get_cookies(),
@@ -406,9 +406,7 @@ def sanitize_stream_urls(
         clean_urls = [url for url in source_urls if not is_pcdn_url(url)] or [
             stream.url
         ]
-        download_urls = list(
-            dict.fromkeys([_replace_host(clean_urls[0]), *clean_urls])
-        )
+        download_urls = list(dict.fromkeys([_replace_host(clean_urls[0]), *clean_urls]))
         stream.url = download_urls[0]
         stream.backup_url = download_urls[1:]
     return video, audio

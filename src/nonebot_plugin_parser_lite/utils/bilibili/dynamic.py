@@ -1,4 +1,4 @@
-from .client import CLIENT
+from .client import HTTP_CLIENT
 from .credential import Credential
 from .exceptions import BiliHelperException
 from .opus import Opus
@@ -35,7 +35,7 @@ class Dynamic:
                 "x-bili-web-req-json": '{"spm_id":"333.1368"}',
             }
             result = (
-                await CLIENT.get(
+                await HTTP_CLIENT.get(
                     url="https://api.bilibili.com/x/polymer/web-dynamic/v1/detail",
                     params=encWbi(params, *(await getWbiKeys())),
                     cookies=self.credential.get_cookies(),

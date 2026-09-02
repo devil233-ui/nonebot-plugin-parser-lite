@@ -1,6 +1,6 @@
 from typing import Any
 
-from .client import CLIENT
+from .client import HTTP_CLIENT
 from .credential import Credential
 from .exceptions import BiliHelperException
 
@@ -25,7 +25,7 @@ class LiveRoom:
         :return: 调用 API 返回的结果
         """
         result = (
-            await CLIENT.get(
+            await HTTP_CLIENT.get(
                 url="https://api.live.bilibili.com/xlive/web-room/v1/index/getInfoByRoom",
                 params={"room_id": self.room_display_id},
                 cookies=self.credential.get_cookies(),

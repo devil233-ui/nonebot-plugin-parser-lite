@@ -3,7 +3,7 @@ from io import BytesIO
 
 import qrcode
 
-from .client import CLIENT
+from .client import HTTP_CLIENT
 from .credential import Credential
 from .exceptions import BiliHelperException
 
@@ -53,7 +53,7 @@ class QrCodeLogin:
         生成二维码
         """
         result = (
-            await CLIENT.get(
+            await HTTP_CLIENT.get(
                 url="https://passport.bilibili.com/x/passport-login/web/qrcode/generate",
                 params={"source": "main-fe-header"},
                 cookies=Credential().get_cookies(),
@@ -84,7 +84,7 @@ class QrCodeLogin:
 
         :return: 二维码登录状态
         """
-        resp = await CLIENT.get(
+        resp = await HTTP_CLIENT.get(
             url="https://passport.bilibili.com/x/passport-login/web/qrcode/poll",
             params={"qrcode_key": self.__qr_key, "source": "main-fe-header"},
         )

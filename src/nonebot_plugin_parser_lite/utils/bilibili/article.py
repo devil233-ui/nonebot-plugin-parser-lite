@@ -1,4 +1,4 @@
-from .client import CLIENT
+from .client import HTTP_CLIENT
 from .credential import Credential
 from .exceptions import BiliHelperException
 from .opus import Opus
@@ -23,7 +23,7 @@ class Article:
         """
         if not self.dyn_str_id:
             result = (
-                await CLIENT.get(
+                await HTTP_CLIENT.get(
                     url="https://api.bilibili.com/x/article/view",
                     params={"id": self.cvid},
                     cookies=self.credential.get_cookies(),

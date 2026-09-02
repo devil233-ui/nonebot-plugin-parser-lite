@@ -13,7 +13,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
 import ujson
 
-from .client import CLIENT, HEADERS
+from .client import HEADERS, HTTP_CLIENT
 from .exceptions import (
     BiliHelperException,
     CookieInvalidException,
@@ -55,6 +55,7 @@ class Credential:
         buvid4: str | None = None,
         dedeuserid: str | None = None,
         ac_time_value: str | None = None,
+        access_key: str | None = None,
     ) -> None:
         """
         各字段获取方式查看：https://nemo2011.github.io/bilibili-api/#/get-credential.md
@@ -65,6 +66,7 @@ class Credential:
         :param buvid4: 浏览器 Cookies 中的 BUVID4 字段值, defaults to None
         :param dedeuserid: 浏览器 Cookies 中的 DedeUserID 字段值, defaults to None
         :param ac_time_value: 浏览器 Cookies 中的 ac_time_value 字段值, defaults to None
+        :param access_key: Access Key, defaults to None
         """
         self.sessdata = (
             None
@@ -78,6 +80,7 @@ class Credential:
         self.buvid4 = buvid4
         self.dedeuserid = dedeuserid
         self.ac_time_value = ac_time_value
+        self.access_key = access_key
 
     def get_cookies(self) -> dict[str, str]:
         """
@@ -113,14 +116,6 @@ class Credential:
             cookies["DedeUserID"] = self.dedeuserid
 
         return cookies
-
-    def has_dedeuserid(self) -> bool:
-        """
-        是否提供 dedeuserid。
-
-        :return: 是否提供 dedeuserid。
-        """
-        return self.dedeuserid is not None and self.dedeuserid != ""
 
     def has_sessdata(self) -> bool:
         """
@@ -176,27 +171,6 @@ class Credential:
         if not self.has_bili_jct():
             raise BiliHelperException("no bili_jct provided")
 
-    def raise_for_no_buvid3(self):
-        """
-        没有提供 buvid3 时抛出异常
-        """
-        if not self.has_buvid3():
-            raise BiliHelperException("no buvid3 provided")
-
-    def raise_for_no_buvid4(self):
-        """
-        没有提供 buvid3 时抛出异常
-        """
-        if not self.has_buvid4():
-            raise BiliHelperException("no buvid4 provided")
-
-    def raise_for_no_dedeuserid(self):
-        """
-        没有提供 DedeUserID 时抛出异常
-        """
-        if not self.has_dedeuserid():
-            raise BiliHelperException("no DedeUserID provided")
-
     def raise_for_no_ac_time_value(self):
         """
         没有提供 ac_time_value 时抛出异常
@@ -247,6 +221,7 @@ class Credential:
         c.buvid4 = cookies.get("buvid4")
         c.dedeuserid = cookies.get("DedeUserID")
         c.ac_time_value = cookies.get("ac_time_value")
+        c.access_key = cookies.get("access_key")
         return c
 
 
@@ -258,7 +233,7 @@ async def _check_valid(credential: Credential) -> bool:
     :return: 是否有效
     """
     result = (
-        await CLIENT.get(
+        await HTTP_CLIENT.get(
             "https://api.bilibili.com/x/web-interface/nav",
             cookies=credential.get_cookies(),
         )
@@ -277,7 +252,7 @@ async def _check_refresh(credential: Credential) -> bool:
     global LAST_CHECK_TIME
     if time.time() - LAST_CHECK_TIME > 60 * 30:
         result = (
-            await CLIENT.get(
+            await HTTP_CLIENT.get(
                 "https://passport.bilibili.com/x/passport-login/web/cookie/info",
                 cookies=credential.get_cookies(),
             )
@@ -299,7 +274,7 @@ def _getCorrespondPath() -> str:
 async def _get_refresh_csrf(credential: Credential) -> str:
     cookies = credential.get_cookies()
     cookies["buvid3"] = str(uuid.uuid1())
-    resp = await CLIENT.get(
+    resp = await HTTP_CLIENT.get(
         url=f"https://www.bilibili.com/correspond/1/{_getCorrespondPath()}",
         cookies=cookies,
     )
@@ -318,7 +293,7 @@ async def _refresh_cookies(credential: Credential) -> Credential:
     refresh_csrf = await _get_refresh_csrf(credential)
     cookies = credential.get_cookies()
     cookies["buvid3"] = str(uuid.uuid1())
-    resp = await CLIENT.post(
+    resp = await HTTP_CLIENT.post(
         url="https://passport.bilibili.com/x/passport-login/web/cookie/refresh",
         cookies=cookies,
         data={
@@ -343,7 +318,7 @@ async def _refresh_cookies(credential: Credential) -> Credential:
 async def _confirm_refresh(
     old_credential: Credential, new_credential: Credential
 ) -> None:
-    await CLIENT.post(
+    await HTTP_CLIENT.post(
         url="https://passport.bilibili.com/x/passport-login/web/confirm/refresh",
         cookies=new_credential.get_cookies(),
         data={
@@ -361,7 +336,7 @@ __buvid4 = ""
 
 async def _get_spi_buvid() -> dict:
     return (
-        await CLIENT.get(url="https://api.bilibili.com/x/frontend/finger/spi")
+        await HTTP_CLIENT.get(url="https://api.bilibili.com/x/frontend/finger/spi")
     ).json()["data"]
 
 
@@ -661,7 +636,7 @@ async def _active_buvid(buvid3: str, buvid4: str):
     buvid_fp = gen_buvid_fp(payload, 31)
     headers = HEADERS.copy()
     headers["Content-Type"] = "application/json"
-    resp = await CLIENT.post(
+    resp = await HTTP_CLIENT.post(
         url="https://api.bilibili.com/x/internal/gaia-gateway/ExClimbWuzhi",
         content=payload,
         headers=headers,

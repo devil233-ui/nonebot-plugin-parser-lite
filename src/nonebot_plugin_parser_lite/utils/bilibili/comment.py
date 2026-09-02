@@ -2,7 +2,7 @@ from enum import IntEnum
 import json
 from typing import Any
 
-from .client import CLIENT
+from .client import HTTP_CLIENT
 from .credential import Credential
 from .exceptions import BiliHelperException
 from .sign import encWbi, getWbiKeys
@@ -77,13 +77,14 @@ async def get_comments(
         "seek_rpid": "",
         "number": number,
         "web_location": 1315875,
+        "pagination_str": (
+            json.dumps({"offset": pagination_str})
+            if pagination_str
+            else json.dumps({"offset": ""})
+        ),
     }
-    if pagination_str:
-        params["pagination_str"] = json.dumps({"offset": pagination_str})
-    else:
-        params["pagination_str"] = json.dumps({"offset": ""})
     result = (
-        await CLIENT.get(
+        await HTTP_CLIENT.get(
             url="https://api.bilibili.com/x/v2/reply/wbi/main",
             params=encWbi(params, *(await getWbiKeys())),
             cookies=credential.get_cookies(),

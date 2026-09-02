@@ -1,6 +1,6 @@
 from enum import Enum, IntEnum
 
-from .client import CLIENT
+from .client import HTTP_CLIENT
 from .credential import Credential
 from .exceptions import BiliHelperException
 
@@ -68,7 +68,7 @@ async def get_video_favorite_list_content(
     credential = credential or Credential()
 
     result = (
-        await CLIENT.get(
+        await HTTP_CLIENT.get(
             url="https://api.bilibili.com/x/v3/fav/resource/list",
             params=params,
             cookies=credential.get_cookies(),

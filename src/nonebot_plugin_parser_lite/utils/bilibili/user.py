@@ -1,6 +1,6 @@
 from typing import Any
 
-from .client import CLIENT
+from .client import HTTP_CLIENT
 from .credential import Credential
 from .exceptions import BiliHelperException
 
@@ -24,7 +24,7 @@ async def get_black_list(
         raise BiliHelperException("page_index 必须大于或等于 1")
     credential = credential or Credential()
     result = (
-        await CLIENT.get(
+        await HTTP_CLIENT.get(
             url="https://api.bilibili.com/x/relation/blacks",
             params={"ps": page_size, "pn": page_index},
             cookies=credential.get_cookies(),

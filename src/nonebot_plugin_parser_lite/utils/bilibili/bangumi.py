@@ -1,6 +1,6 @@
 from typing import Any
 
-from .client import CLIENT
+from .client import HTTP_CLIENT
 from .exceptions import BiliHelperException
 
 
@@ -21,7 +21,7 @@ class Bangumi:
 
     async def get_info(self) -> dict[str, Any]:
         result = (
-            await CLIENT.get(
+            await HTTP_CLIENT.get(
                 url="https://api.bilibili.com/pgc/view/web/season",
                 params={"season_id": self.season_id, "ep_id": self.ep_id},
             )

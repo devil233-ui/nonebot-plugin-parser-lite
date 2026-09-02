@@ -7,7 +7,7 @@ from anyio import Path
 from nonebot import logger
 
 from ...path import data_dir
-from .client import CLIENT
+from .client import HTTP_CLIENT
 
 CDN_DATA_URL: Final[str] = "https://kanda-akihito-kun.github.io/ccb/api/cdn.json"
 CDN_DATA_PATH: Final[Path] = data_dir / "bilibili_cdn.json"
@@ -101,7 +101,7 @@ def choose_cdn_domain(region: str) -> str:
 
 async def update_cdn_domains(path: Path = CDN_DATA_PATH) -> None:
     """下载 CDN 列表并原子更新 data 目录中的快照"""
-    response = await CLIENT.get(CDN_DATA_URL)
+    response = await HTTP_CLIENT.get(CDN_DATA_URL)
     response.raise_for_status()
     data = response.json()
     validated_data = _validate_cdn_data(data)

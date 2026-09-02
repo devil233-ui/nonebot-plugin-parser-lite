@@ -4,7 +4,7 @@ import time
 from typing import Any
 from urllib.parse import quote, urlencode
 
-from .client import CLIENT
+from .client import HTTP_CLIENT
 
 # fmt: off
 mixinKeyEncTab = [
@@ -47,7 +47,7 @@ async def getWbiKeys() -> tuple[str, str]:
     now = int(time.time())
     if IMG_KEY and SUB_KEY and WBI_KEY_EXPIRE > now:
         return IMG_KEY, SUB_KEY
-    resp = await CLIENT.get(url="https://api.bilibili.com/x/web-interface/nav")
+    resp = await HTTP_CLIENT.get(url="https://api.bilibili.com/x/web-interface/nav")
     resp.raise_for_status()
     json_content = resp.json()
     img_url: str = json_content["data"]["wbi_img"]["img_url"]
