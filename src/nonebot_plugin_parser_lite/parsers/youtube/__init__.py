@@ -186,7 +186,7 @@ if yt_dlp_downloader is not None:
             if video_info.is_live or video_info.duration is None:
                 if video_info.thumbnail:
                     content.append(self.create_image(video_info.thumbnail))
-            elif duration <= pconfig.duration_maximum:
+            else:
                 video = yt_dlp_downloader.download_video(
                     url=url,
                     cookiefile=self.cookies_file,
@@ -200,8 +200,6 @@ if yt_dlp_downloader is not None:
                 if video_info.size_bytes:
                     video_content._size_bytes = video_info.size_bytes
                 content.append(video_content)
-            elif video_info.thumbnail:
-                content.append(self.create_image(video_info.thumbnail))
 
             return self.result(
                 author=author,

@@ -244,11 +244,6 @@ class YtdlpDownloader:
         """使用 yt-dlp 下载并合并油管视频。"""
         del ext_headers, use_curl_cffi
         video_info = await self.extract_video_info(url, cookiefile)
-        duration = video_info.duration or 0
-        if duration > pconfig.duration_maximum:
-            raise DownloadException(
-                f"视频时长 {duration:.0f} 秒，超过 {pconfig.duration_maximum} 秒"
-            )
         if video_info.size_bytes:
             size_mb = video_info.size_bytes / 1024 / 1024
             if size_mb > pconfig.max_size:
