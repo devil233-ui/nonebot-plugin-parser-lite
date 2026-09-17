@@ -172,15 +172,14 @@ class Config(BaseModel):
         return self.plite_linuxdo_ck
 
     @property
-<<<<<<< HEAD
-    def x_ck(self) -> str | None:
-        """X cookies"""
-        return self.plite_x_ck
-=======
     def ytb_ck(self) -> str | None:
         """youtube cookies"""
         return self.plite_ytb_ck
->>>>>>> 454a6e3 (✨ feat(youtube): 完善油管解析与渲染)
+
+    @property
+    def x_ck(self) -> str | None:
+        """X cookies"""
+        return self.plite_x_ck
 
     @property
     def need_upload_audio(self) -> bool:
