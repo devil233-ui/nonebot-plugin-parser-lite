@@ -114,7 +114,7 @@ async def test_douyin_video_downloader_rotates_all_lines(monkeypatch) -> None:
         aweme_module.DOWNLOADER, "download_video", fake_download_video
     )
 
-    downloader = DouyinVideoDownloader(list(CDN_LINES), DOUYIN_HEADERS)
+    downloader = DouyinVideoDownloader(list(CDN_LINES), DOUYIN_HEADERS, "douyin:123:456")
     await downloader()
 
     assert calls[0]["url"] == CDN_LINES[0]
@@ -124,7 +124,7 @@ async def test_douyin_video_downloader_rotates_all_lines(monkeypatch) -> None:
 
 
 def test_douyin_video_downloader_ignores_empty_urls() -> None:
-    downloader = DouyinVideoDownloader(["", "https://cdn.example/only.mp4"], None)
+    downloader = DouyinVideoDownloader(["", "https://cdn.example/only.mp4"], None, "douyin:1223:456")
 
     assert downloader.url_list == ["https://cdn.example/only.mp4"]
     assert downloader.url == "https://cdn.example/only.mp4"
