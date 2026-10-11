@@ -42,6 +42,7 @@ class DouyinVideoDownloader:
         self.url = self.url_list[0] if self.url_list else ""
         self.ext_headers = ext_headers
         self.cache_key = cache_key
+        self.cache_variant = cache_variant
 
     async def __call__(self) -> Any:
         return await DOWNLOADER.download_video(
