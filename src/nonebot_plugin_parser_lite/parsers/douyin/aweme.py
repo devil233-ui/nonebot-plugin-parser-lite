@@ -164,13 +164,12 @@ class Aweme(Struct):
                         )
                     )
                 elif image_video := image.video:
-                    video_downloader = DouyinVideoDownloader(
-                        image_video.play_addr.url_list,
-                        ext_headers={"Referer": "https://www.douyin.com/"},
-                    )
                     content.append(
-                        Creator.video(
-                            url_or_task=video_downloader,
+                        Creator.live_photo(
+                            video_url=DouyinVideoDownloader(
+                                image_video.play_addr.url_list,
+                                ext_headers={"Referer": "https://www.douyin.com/"},
+                            ),
                             image_url=image_video.cover.url_list[-1],
                             bgm_url=music_url,
                             cache_key=image_cache_key,
