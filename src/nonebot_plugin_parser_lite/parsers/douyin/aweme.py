@@ -37,10 +37,11 @@ class DouyinVideoDownloader:
     满足 Creator.video 的 DownloadFunc 协议（url / ext_headers / __call__）。
     """
 
-    def __init__(self, url_list: list[str], ext_headers: dict[str, str] | None):
+    def __init__(self, url_list: list[str], ext_headers: dict[str, str] | None, cache_key: str, cache_variant: str | None = None):
         self.url_list = [url for url in url_list if url]
         self.url = self.url_list[0] if self.url_list else ""
         self.ext_headers = ext_headers
+        self.cache_key = cache_key
 
     async def __call__(self) -> Any:
         return await DOWNLOADER.download_video(
@@ -48,6 +49,8 @@ class DouyinVideoDownloader:
             fallback_urls=self.url_list[1:],
             retry_http_statuses=DOUYIN_RETRYABLE_HTTP_STATUSES,
             ext_headers=self.ext_headers,
+            cache_key=self.cache_key,
+            cache_variant=self.cache_variant,
         )
 
 
@@ -169,6 +172,8 @@ class Aweme(Struct):
                             video_url=DouyinVideoDownloader(
                                 image_video.play_addr.url_list,
                                 ext_headers={"Referer": "https://www.douyin.com/"},
+                                cache_key=image_cache_key,
+                                cache_variant="motion",
                             ),
                             image_url=image_video.cover.url_list[-1],
                             bgm_url=music_url,
@@ -183,6 +188,7 @@ class Aweme(Struct):
                     url_or_task=DouyinVideoDownloader(
                         video.play_addr.url_list,
                         ext_headers={"Referer": "https://www.douyin.com/"},
+                        cache_key=aweme_cache_key,
                     ),
                     cover_url=video.cover_original_scale.url_list[-1]
                     if video.cover_original_scale
