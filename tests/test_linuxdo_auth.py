@@ -2,10 +2,13 @@
 
 from typing import Any
 
+from curl_cffi.requests.cookies import Cookies as CurlCookies
+import httpx
 import pytest
 from render_test_support import ROOT  # noqa: F401  初始化插件包导入环境
 
 from nonebot_plugin_parser_lite.config import pconfig
+from nonebot_plugin_parser_lite.download.client import UniResponse
 from nonebot_plugin_parser_lite.parsers.linuxdo.auth import (
     SESSION_URL,
     LinuxDoAuth,
@@ -206,3 +209,48 @@ async def test_tip_for_status_rate_limit(tmp_path, monkeypatch) -> None:
 
     tip = await auth.tip_for_status(429)
     assert "过于频繁" in tip.message
+
+
+def test_uniresponse_reads_httpx_response_cookies() -> None:
+    """httpx 的 Cookies 没有 get_dict()，适配器必须改用 items()。"""
+    raw = httpx.Response(
+        200,
+        headers={"set-cookie": "_t=from-httpx; Path=/; HttpOnly"},
+        request=httpx.Request("GET", SESSION_URL),
+    )
+
+    assert UniResponse(raw).cookies == {"_t": "from-httpx"}
+
+
+def test_uniresponse_reads_curl_cffi_response_cookies() -> None:
+    cookies = CurlCookies()
+    cookies.set("_t", "from-curl", domain="linux.do", path="/")
+
+    class RawCurlResponse:
+        pass
+
+    raw = RawCurlResponse()
+    raw.cookies = cookies  # type: ignore[attr-defined]
+
+    assert UniResponse(raw).cookies == {"_t": "from-curl"}  # type: ignore[arg-type]
+
+
+@pytest.mark.asyncio
+async def test_update_from_response_persists_through_real_uniresponse(
+    tmp_path, monkeypatch
+) -> None:
+    """持久化链路必须走真实 UniResponse 适配器，而不是假的 cookies 字典。"""
+    cookie_path = tmp_path / "linuxdo_cookies.txt"
+    monkeypatch.setattr(pconfig, "plite_linuxdo_ck", None)
+    auth = LinuxDoAuth(FakeClient(), {}, cookie_path=cookie_path)
+    raw = httpx.Response(
+        200,
+        headers={"set-cookie": "_t=real-adapter; Path=/; HttpOnly"},
+        request=httpx.Request("GET", SESSION_URL),
+    )
+
+    await auth.update_from_response(UniResponse(raw))
+
+    assert cookie_path.read_text() == "_t=real-adapter"
+    assert await auth.cookies() == {"_t": "real-adapter"}
+

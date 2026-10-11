@@ -78,12 +78,12 @@ class UniResponse:
         raw_cookies = getattr(self._raw, "cookies", None)
         if raw_cookies is None:
             return {}
+        # httpx 的 Cookies 没有 get_dict()，只有 items()；curl_cffi 两者都有。
         try:
             return {
-                str(name): str(value)
-                for name, value in raw_cookies.get_dict().items()
+                str(name): str(value) for name, value in raw_cookies.items()
             }
-        except AttributeError:
+        except (AttributeError, TypeError):
             return {}
 
     @property
