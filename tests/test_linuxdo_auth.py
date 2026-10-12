@@ -254,3 +254,72 @@ async def test_update_from_response_persists_through_real_uniresponse(
     assert cookie_path.read_text() == "_t=real-adapter"
     assert await auth.cookies() == {"_t": "real-adapter"}
 
+
+@pytest.mark.asyncio
+async def test_bootstrap_same_identity_keeps_fresh_cache(
+    tmp_path, monkeypatch
+) -> None:
+    """身份 Cookie 相同时，缓存里服务端轮换过的会话 Cookie 不能被配置旧值覆盖。"""
+    cookie_path = tmp_path / "linuxdo_cookies.txt"
+    cookie_path.write_text("_t=tk; _forum_session=fresh-session")
+    monkeypatch.setattr(
+        pconfig, "plite_linuxdo_ck", "_t=tk; _forum_session=stale-session"
+    )
+
+    auth = LinuxDoAuth(FakeClient(), {}, cookie_path=cookie_path)
+
+    cookies = await auth.cookies()
+    assert cookies["_t"] == "tk"
+    assert cookies["_forum_session"] == "fresh-session"
+
+
+@pytest.mark.asyncio
+async def test_bootstrap_new_identity_overrides_cache(tmp_path, monkeypatch) -> None:
+    """身份 Cookie 变了说明用户换了登录态，配置应当整体覆盖缓存。"""
+    cookie_path = tmp_path / "linuxdo_cookies.txt"
+    cookie_path.write_text("_t=old-token; _forum_session=old-session")
+    monkeypatch.setattr(
+        pconfig, "plite_linuxdo_ck", "_t=new-token; _forum_session=new-session"
+    )
+
+    auth = LinuxDoAuth(FakeClient(), {}, cookie_path=cookie_path)
+
+    assert await auth.cookies() == {
+        "_t": "new-token",
+        "_forum_session": "new-session",
+    }
+
+
+@pytest.mark.asyncio
+async def test_cleared_cookie_is_removed_from_cache(tmp_path, monkeypatch) -> None:
+    """服务端下发清除值时，缓存里的旧 Cookie 必须被删掉。"""
+    cookie_path = tmp_path / "linuxdo_cookies.txt"
+    cookie_path.write_text("_t=alive-value; keep=1")
+    monkeypatch.setattr(pconfig, "plite_linuxdo_ck", None)
+    auth = LinuxDoAuth(FakeClient(), {}, cookie_path=cookie_path)
+
+    await auth.update_from_response(FakeResponse(200, cookies={"_t": "deleted"}))
+
+    cookies = await auth.cookies()
+    assert "_t" not in cookies
+    assert cookies["keep"] == "1"
+    assert cookie_path.read_text() == "keep=1"
+
+
+@pytest.mark.asyncio
+async def test_repeated_failures_share_single_probe(tmp_path, monkeypatch) -> None:
+    """连续失败的主题不应反复探测登录态接口。"""
+    client = FakeClient(
+        FakeResponse(200, payload={"current_user": {"id": 1}}),
+        FakeResponse(200, payload={"current_user": {"id": 1}}),
+    )
+    auth = make_auth(client, tmp_path, bootstrap="_t=abc", monkeypatch=monkeypatch)
+
+    first = await auth.tip_for_status(403)
+    second = await auth.tip_for_status(403)
+
+    assert "登录态已失效" not in first.message
+    assert "登录态已失效" not in second.message
+    assert client.calls == [SESSION_URL]
+
+

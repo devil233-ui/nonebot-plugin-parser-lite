@@ -88,6 +88,7 @@ class LinuxDoAuth:
         self._validation_lock = asyncio.Lock()
         self._validation: bool | None = None
         self._validation_expires_at = 0.0
+        self._failed_probe_at = 0.0
 
     @staticmethod
     def _parse_cookie(raw: str, *, source: str) -> dict[str, str]:
@@ -124,7 +125,17 @@ class LinuxDoAuth:
         bootstrap = self._parse_cookie(
             pconfig.linuxdo_ck or "", source="配置 bootstrap"
         )
-        self._cookies = {**cached, **bootstrap}
+        if not bootstrap:
+            self._cookies = dict(cached)
+        elif bootstrap.get(IDENTITY_COOKIE_NAME) != cached.get(
+            IDENTITY_COOKIE_NAME
+        ):
+            # 身份 Cookie 与缓存不同 = 用户换了新的登录态，以配置为准
+            self._cookies = {**cached, **bootstrap}
+        else:
+            # 身份相同：缓存里是服务端轮换后的会话 Cookie，
+            # 不能被配置里可能已经过期的同值覆盖
+            self._cookies = {**bootstrap, **cached}
         return self._cookies
 
     async def cookies(self) -> dict[str, str]:
@@ -159,6 +170,11 @@ class LinuxDoAuth:
         response_cookies = drop_cleared_cookies(
             response.cookies, source="响应"
         )
+        cleared = {
+            name
+            for name, value in response.cookies.items()
+            if is_cleared_cookie(value)
+        }
         async with self._cookie_lock:
             cookies = await self._ensure_loaded()
             changed = any(
@@ -167,7 +183,13 @@ class LinuxDoAuth:
             )
             if changed:
                 cookies.update(response_cookies)
-            if changed or response.is_success:
+            # 服务端明确清除的 Cookie 要从缓存里删掉，否则旧值会被一直带着发出去
+            removed = {name for name in cleared if name in cookies}
+            for name in removed:
+                cookies.pop(name, None)
+            if IDENTITY_COOKIE_NAME in removed:
+                self._set_validation(None, 0.0)
+            if changed or removed or response.is_success:
                 await self._persist_locked()
 
     def _set_validation(self, value: bool | None, ttl: float) -> bool | None:
@@ -254,7 +276,15 @@ class LinuxDoAuth:
 
         if status_code in {401, 403, 404}:
             cookies = await self.cookies()
-            login_state = await self.validate_login(force=True)
+            # 认证类失败说明缓存里「已登录」的结论可能过时：让它失效后重新探测，
+            # 但 60 秒内只确认一次，且并发调用共享同一次探测结果，
+            # 避免连续失败的主题把 /session/current.json 打成风控。
+            now = monotonic()
+            if now - self._failed_probe_at >= self._FAILED_VALIDATION_TTL:
+                self._failed_probe_at = now
+                if self._validation is True:
+                    self._validation_expires_at = 0.0
+            login_state = await self.validate_login()
             if login_state is False:
                 if cookies:
                     return TipException(
