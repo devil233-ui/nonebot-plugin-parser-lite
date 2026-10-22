@@ -174,8 +174,17 @@ def pack_forward_items(
     items: list[ForwardItem],
     content_of: Callable[[ForwardItem], ForwardNodeInner],
     with_content: Callable[[ForwardItem, ForwardNodeInner], ForwardItem],
+    node_limit: int | None = None,
 ) -> Iterator[list[ForwardItem]]:
-    """统一清理节点首尾换行，并按文本长度和节点数分包"""
+    """统一清理节点首尾换行，并按文本长度和节点数分包。
+
+    :param node_limit: 单条合并转发的节点上限；省略时使用平台上限
+    """
+    limit = (
+        MAX_FORWARD_NODES
+        if node_limit is None
+        else min(max(node_limit, 1), MAX_FORWARD_NODES)
+    )
     chunk: list[ForwardItem] = []
     text_length = 0
     for item in items:
@@ -190,7 +199,7 @@ def pack_forward_items(
         length = len(UniMessage(content).extract_plain_text())
         if chunk and (
             text_length + length > MAX_FORWARD_TEXT_LEN
-            or len(chunk) >= MAX_FORWARD_NODES
+            or len(chunk) >= limit
         ):
             yield chunk
             chunk = []

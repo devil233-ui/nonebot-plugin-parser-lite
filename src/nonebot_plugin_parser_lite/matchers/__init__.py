@@ -22,6 +22,7 @@ from tarina import LRU
 
 from ..config import pconfig
 from ..constants import PlatformEnum
+from ..data import MediaContent
 from ..delivery import send_with_media_fallback
 from ..download import DOWNLOADER
 from ..helper import UniHelper
@@ -166,6 +167,21 @@ async def parser_handler(
         state.succeeded = True
 
 
+def _has_sendable_media(result: ParseResult) -> bool:
+    """是否还有需要随消息发送的媒体（纯文字结果不进懒下载分支）。
+
+    拿不到内容列表时按「有媒体」处理，保持懒下载原有的注册语义。
+    """
+    contents = getattr(result, "content", None)
+    if contents is None:
+        return True
+    items = list(contents)
+    repost = getattr(result, "repost", None)
+    if repost is not None:
+        items.extend(getattr(repost, "content", ()) or ())
+    return any(isinstance(content, MediaContent) and content.need_send for content in items)
+
+
 @UniHelper.with_reaction
 async def _parse_and_send(
     session: Uninfo,
@@ -180,9 +196,17 @@ async def _parse_and_send(
     if summary_msg and not summary_in_forward:
         if state:
             state.output_started = True
-        await send_with_media_fallback(summary_msg, result)
+        # 部分协议端会在消息实际发出后仍报告超时，继续处理后续内容；
+        # 媒体上传失败的降级由 send_with_media_fallback 处理。
+        try:
+            await send_with_media_fallback(summary_msg, result)
+        except Exception as e:
+            logger.warning(
+                f"发送摘要消息时抛出异常 (视为超时假报错，将继续处理后续内容): {e}"
+            )
 
-    if pconfig.lazy_download:
+    # 纯文字仍需进入 send_content；仅有待发送媒体时启用懒下载。
+    if pconfig.lazy_download and _has_sendable_media(result):
         if pconfig.lazy_download_tip:
             download_cmd = ", ".join(pconfig.download_command)
             if state:

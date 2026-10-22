@@ -33,6 +33,16 @@ STICKER_CDN: Final[str] = "https://sticker.sokoko.org/assets/{platform}/{name}"
 
 
 class PlatformEnum(StrEnum):
+    # 本地扩展放在最前，避免上游在枚举末尾追加成员时冲突
+    YOUTUBE = "youtube"
+
+    @classmethod
+    def _missing_(cls, value: object) -> "PlatformEnum | None":
+        """兼容 YouTube 配置中常用的 ytb 名称。"""
+        if value == "ytb":
+            return cls.YOUTUBE
+        return None
+
     ACFUN = "acfun"
     BILIBILI = "bilibili"
     DOUYIN = "douyin"

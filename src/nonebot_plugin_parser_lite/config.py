@@ -5,6 +5,7 @@ from nonebot import get_driver, get_plugin_config
 from pydantic import BaseModel, field_validator, model_validator
 
 from .constants import PlatformEnum, SendComponent
+from .local_config import LocalConfigMixin
 from .path import cache_dir as _cache_dir
 from .path import config_dir as _config_dir
 from .path import data_dir as _data_dir
@@ -49,7 +50,7 @@ def parse_media_speedup_rules(
     return rules
 
 
-class Config(BaseModel):
+class Config(LocalConfigMixin, BaseModel):
     plite_zhihu_ck: str | None = None
     """知乎 cookies"""
     plite_linuxdo_ck: str | None = None

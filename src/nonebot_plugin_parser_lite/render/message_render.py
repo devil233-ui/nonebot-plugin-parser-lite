@@ -1,7 +1,9 @@
 """消息编排：将解析结果转换为可发送/合并转发的消息序列"""
 
+import asyncio
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
+from itertools import chain
 from typing import TYPE_CHECKING, Any
 
 from anyio import Path
@@ -110,43 +112,81 @@ class MessageRenderMixin:
         summary_node: UniMessage[Any] | None,
         state: "_SendState",
     ) -> AsyncGenerator[UniMessage[Any], None]:
-        """遍历媒体，立即发送的逐条 yield，待转发的收集进 state"""
+        """遍历媒体，立即发送的逐条 yield，待转发的收集进 state
+
+        各媒体的下载/构建先并发预取，再按内容顺序消费，保证消息顺序稳定。
+        """
         components = pconfig.send_components
         forward = pconfig.forward_components.intersection(components)
+        # 先按 send_components 过滤，避免为不会发送的内容白白下载媒体
+        media_contents = [
+            cont
+            for cont in result.iter_sendable_media()
+            if not (
+                isinstance(cont, VideoContent) and SendComponent.VIDEO not in components
+            )
+            and not (
+                isinstance(cont, AudioContent) and SendComponent.AUDIO not in components
+            )
+        ]
+        video_in_forward = SendComponent.VIDEO in forward
 
         def collect(cont: MediaContent, message: UniMessage[Any]) -> None:
             state.deferred_media_segs.setdefault(id(cont), []).append(message)
 
-        for cont in result.iter_sendable_media():
-            if isinstance(cont, VideoContent) and SendComponent.VIDEO not in components:
-                continue
-            if isinstance(cont, AudioContent) and SendComponent.AUDIO not in components:
-                continue
-            try:
-                if (
-                    isinstance(cont, VideoContent)
-                    and SendComponent.VIDEO in forward
-                ):
-                    state.forward_video_segs[id(cont)] = await self.__build_video_seg(
-                        cont
+        async def build_immediate(cont: MediaContent) -> list[UniMessage[Any]]:
+            return [
+                message async for message in self.__handle_immediate_media(cont)
+            ]
+
+        # 预取：先并发启动各媒体的下载/构建，再按内容顺序消费
+        media_tasks: dict[int, asyncio.Task[list[UniMessage[Any]]]] = {}
+        video_seg_tasks: dict[int, asyncio.Task[ForwardNodeInner]] = {}
+        for cont in media_contents:
+            if isinstance(cont, VideoContent) and video_in_forward:
+                video_seg_tasks[id(cont)] = asyncio.create_task(
+                    self.__build_video_seg(cont)
+                )
+            else:
+                media_tasks[id(cont)] = asyncio.create_task(build_immediate(cont))
+
+        try:
+            for cont in media_contents:
+                try:
+                    if isinstance(cont, VideoContent) and video_in_forward:
+                        state.forward_video_segs[id(cont)] = await video_seg_tasks[
+                            id(cont)
+                        ]
+                        continue
+                    messages = await media_tasks[id(cont)]
+                except SizeLimitException:
+                    message = UniMessage(
+                        f"媒体太大啦，还是去{result.platform.display_name}看看吧~"
                     )
-                    continue
-                async for message in self.__handle_immediate_media(cont):
                     if summary_node is None:
                         yield message
                     else:
                         collect(cont, message)
-            except SizeLimitException:
-                message = UniMessage(
-                    f"媒体太大啦，还是去{result.platform.display_name}看看吧~"
-                )
-                if summary_node is None:
-                    yield message
-                else:
-                    collect(cont, message)
-            except DownloadException as e:
-                state.failed_count += 1
-                logger.exception(f"{cont.__class__.__name__} 下载失败: {e!r}")
+                    continue
+                except DownloadException as e:
+                    state.failed_count += 1
+                    logger.exception(f"{cont.__class__.__name__} 下载失败: {e!r}")
+                    continue
+                except Exception as e:
+                    state.failed_count += 1
+                    logger.exception(
+                        f"{cont.__class__.__name__} 下载过程中发生未预期异常: {e!r}"
+                    )
+                    continue
+                for message in messages:
+                    if summary_node is None:
+                        yield message
+                    else:
+                        collect(cont, message)
+        finally:
+            for task in chain(media_tasks.values(), video_seg_tasks.values()):
+                if not task.done():
+                    task.cancel()
 
     def __pack_forward_messages(
         self,
@@ -179,6 +219,11 @@ class MessageRenderMixin:
                 processed_segs,
                 content_of=lambda content: content,
                 with_content=lambda _original, content: content,
+                node_limit=(
+                    pconfig.forward_small_batch_size
+                    if total_plain_len > pconfig.forward_long_text_threshold
+                    else pconfig.forward_large_batch_size
+                ),
             )
         ]
 
@@ -204,7 +249,7 @@ class MessageRenderMixin:
         return (
             body_in_forward
             or total_plain_len > SPLIT_THRESHOLD
-            or len(ordered_segs) > 4
+            or len(ordered_segs) > pconfig.forward_node_threshold
             or bool(forward_video_segs)
             or summary_node is not None
         )
