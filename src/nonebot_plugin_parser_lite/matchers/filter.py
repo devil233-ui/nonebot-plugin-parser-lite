@@ -17,6 +17,7 @@ _DISABLED_TARGETS_LOCK = asyncio.Lock()
 
 async def _write_disabled_targets(targets: set[str]) -> None:
     temp_path = _DISABLED_TARGETS_PATH.with_suffix(".json.tmp")
+    await temp_path.parent.mkdir(parents=True, exist_ok=True)
     try:
         await temp_path.write_text(
             json.dumps(sorted(targets), ensure_ascii=False),
